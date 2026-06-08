@@ -132,7 +132,6 @@
       cell.className = extraClasses;
       cell.contentEditable = 'true';
       cell.spellcheck = false;
-      cell.dataset.original = text;
       return cell;
     }
 
@@ -176,17 +175,9 @@
               'focus:bg-blue-50',
             ].join(' ')
           );
-
-          td.addEventListener('focus', () => {
-            // Khi người dùng tập trung vào ô, để trống sẽ giúp nhập nhanh như Excel
-            if (td.textContent === td.dataset.original) {
-              td.textContent = '';
-            }
-          });
-
           td.addEventListener('blur', () => {
-            // Nếu người dùng xóa hết thì trả lại trạng thái trống để giữ bảng gọn
-            td.dataset.original = td.textContent.trim();
+            // Gi? nguy�n n?i dung ngu?i d�ng nh?p, ch? d?n kho?ng tr?ng th?a
+            td.textContent = td.textContent.trim();
           });
 
           tr.appendChild(td);
@@ -222,4 +213,5 @@
   </script>
 </body>
 </html>
+
 
