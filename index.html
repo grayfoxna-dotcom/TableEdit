@@ -11,25 +11,83 @@
       scrollbar-width: thin;
       scrollbar-color: rgb(148 163 184) rgb(241 245 249);
     }
+
     .sheet-scroll::-webkit-scrollbar {
       width: 12px;
       height: 12px;
     }
+
     .sheet-scroll::-webkit-scrollbar-track {
       background: rgb(241 245 249);
     }
+
     .sheet-scroll::-webkit-scrollbar-thumb {
       background: rgb(148 163 184);
       border-radius: 9999px;
       border: 3px solid rgb(241 245 249);
     }
+
     .sheet-scroll::-webkit-scrollbar-thumb:hover {
       background: rgb(100 116 139);
     }
 
-    /* Dùng lớp riêng để tách phần bảng ra khỏi khung cuộn */
+    /* Dùng zoom thay vì transform để sticky vẫn bám đúng khi cuộn */
     .sheet-zoom {
       zoom: 1;
+    }
+
+    .sheet-cell {
+      position: relative;
+      min-width: 9rem;
+      height: 3rem;
+      overflow: hidden;
+      vertical-align: top;
+    }
+
+    .cell-content {
+      display: block;
+      width: 100%;
+      height: 100%;
+      padding: 0.5rem 0.75rem;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-sizing: border-box;
+      line-height: 1.5rem;
+      max-height: 100%;
+      scrollbar-width: none;
+    }
+
+    .cell-content::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cell-content:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 2px rgb(59 130 246 / 0.9);
+      background: rgb(239 246 255);
+    }
+
+    .resize-handle-col {
+      position: absolute;
+      top: 0;
+      right: -3px;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+      z-index: 40;
+    }
+
+    .resize-handle-row {
+      position: absolute;
+      left: 0;
+      bottom: -3px;
+      width: 100%;
+      height: 6px;
+      cursor: row-resize;
+      user-select: none;
+      z-index: 40;
     }
 
     /* Tạo cảm giác bảng tính rõ ràng hơn */
@@ -72,7 +130,7 @@
         <div id="sheetViewport" class="sheet-scroll relative flex-1 overflow-auto border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
           <div id="sheetStage" class="relative">
             <div id="sheetWrap" class="sheet-zoom">
-              <table class="w-max border-separate border-spacing-0 text-sm">
+              <table class="w-max table-fixed border-separate border-spacing-0 text-sm">
                 <thead id="tableHead"></thead>
                 <tbody id="tableBody"></tbody>
               </table>
@@ -84,7 +142,7 @@
   </div>
 
   <script>
-    // Danh sách cột kiểu Excel: A, B, C ... Z, AA, AB ...
+    // Chuyển số cột thành tên kiểu Excel: A, B, C ... Z, AA, AB ...
     function getColumnName(index) {
       let name = '';
       let current = index + 1;
@@ -104,9 +162,14 @@
     const MIN_ZOOM = 50;
     const MAX_ZOOM = 200;
     const STEP_ZOOM = 10;
+    const DEFAULT_COL_WIDTH = 144;
+    const DEFAULT_ROW_HEIGHT = 48;
+    const MIN_COL_WIDTH = 80;
+    const MAX_COL_WIDTH = 420;
+    const MIN_ROW_HEIGHT = 32;
+    const MAX_ROW_HEIGHT = 240;
 
     const sheetViewport = document.getElementById('sheetViewport');
-    const sheetStage = document.getElementById('sheetStage');
     const sheetWrap = document.getElementById('sheetWrap');
     const tableHead = document.getElementById('tableHead');
     const tableBody = document.getElementById('tableBody');
@@ -116,22 +179,113 @@
     const zoomOutBtn = document.getElementById('zoomOut');
 
     let zoom = DEFAULT_ZOOM;
+    const colWidths = Array.from({ length: COLS }, () => DEFAULT_COL_WIDTH);
+    const rowHeights = Array.from({ length: ROWS }, () => DEFAULT_ROW_HEIGHT);
+
     function setZoom(nextZoom) {
       zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
       const scale = zoom / 100;
 
-      // Dùng zoom thay vì transform để sticky vẫn bám đúng khi cuộn
+      // Dùng zoom để sticky vẫn hoạt động đúng khi cuộn
       sheetWrap.style.zoom = String(scale);
       zoomLabel.textContent = `${zoom}%`;
       zoomRange.value = String(zoom);
     }
 
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function applyColumnWidth(colIndex, width) {
+      const nextWidth = clamp(width, MIN_COL_WIDTH, MAX_COL_WIDTH);
+      colWidths[colIndex] = nextWidth;
+
+      document.querySelectorAll(`[data-col="${colIndex}"]`).forEach((el) => {
+        el.style.width = `${nextWidth}px`;
+        el.style.minWidth = `${nextWidth}px`;
+        el.style.maxWidth = `${nextWidth}px`;
+      });
+    }
+
+    function applyRowHeight(rowIndex, height) {
+      const nextHeight = clamp(height, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+      rowHeights[rowIndex] = nextHeight;
+
+      document.querySelectorAll(`[data-row="${rowIndex}"]`).forEach((el) => {
+        el.style.height = `${nextHeight}px`;
+        el.style.minHeight = `${nextHeight}px`;
+        el.style.maxHeight = `${nextHeight}px`;
+      });
+    }
+
+    function setupColumnResize(handle, colIndex) {
+      let startX = 0;
+      let startWidth = 0;
+
+      const onMouseMove = (event) => {
+        applyColumnWidth(colIndex, startWidth + (event.clientX - startX));
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      handle.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startX = event.clientX;
+        startWidth = colWidths[colIndex];
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+
+    function setupRowResize(handle, rowIndex) {
+      let startY = 0;
+      let startHeight = 0;
+
+      const onMouseMove = (event) => {
+        applyRowHeight(rowIndex, startHeight + (event.clientY - startY));
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      handle.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startY = event.clientY;
+        startHeight = rowHeights[rowIndex];
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+
     function createCell(tagName, text, extraClasses = '') {
       const cell = document.createElement(tagName);
-      cell.textContent = text;
       cell.className = extraClasses;
-      cell.contentEditable = 'true';
-      cell.spellcheck = false;
+      const content = document.createElement('div');
+      content.className = 'cell-content';
+      content.contentEditable = 'true';
+      content.spellcheck = false;
+      content.textContent = text;
+
+      content.addEventListener('focus', () => {
+        // Giữ vùng nhập bên trong ô ở vị trí đầu khi bắt đầu chỉnh sửa
+        content.scrollTop = 0;
+        content.scrollLeft = 0;
+      });
+
+      content.addEventListener('blur', () => {
+        // Khi rời ô, đưa nội dung bên trong về đầu để ô kế tiếp luôn gọn gàng
+        content.scrollTop = 0;
+        content.scrollLeft = 0;
+      });
+
+      cell.appendChild(content);
       return cell;
     }
 
@@ -141,16 +295,27 @@
       const corner = document.createElement('th');
       corner.textContent = '';
       corner.className = [
-        'sticky left-0 top-0 z-30 h-10 min-w-16 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
+        'relative sticky left-0 top-0 z-30 h-10 min-w-16 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
       ].join(' ');
       headRow.appendChild(corner);
 
       for (let col = 0; col < COLS; col += 1) {
         const th = document.createElement('th');
+        th.dataset.col = String(col);
         th.textContent = getColumnName(col);
         th.className = [
-          'sticky top-0 z-20 h-10 min-w-36 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
+          'relative sticky top-0 z-20 h-10 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
         ].join(' ');
+
+        th.style.width = `${colWidths[col]}px`;
+        th.style.minWidth = `${colWidths[col]}px`;
+        th.style.maxWidth = `${colWidths[col]}px`;
+
+        const handle = document.createElement('div');
+        handle.className = 'resize-handle-col';
+        th.appendChild(handle);
+        setupColumnResize(handle, col);
+
         headRow.appendChild(th);
       }
 
@@ -158,12 +323,25 @@
 
       for (let row = 0; row < ROWS; row += 1) {
         const tr = document.createElement('tr');
+        tr.dataset.row = String(row);
+        tr.style.height = `${rowHeights[row]}px`;
 
         const rowHead = document.createElement('th');
+        rowHead.dataset.row = String(row);
         rowHead.textContent = String(row + 1);
         rowHead.className = [
-          'sticky left-0 z-20 h-12 w-16 min-w-16 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
+          'relative sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500 overflow-hidden',
         ].join(' ');
+        rowHead.style.width = '4rem';
+        rowHead.style.minWidth = '4rem';
+        rowHead.style.maxWidth = '4rem';
+        rowHead.style.height = `${rowHeights[row]}px`;
+
+        const rowHandle = document.createElement('div');
+        rowHandle.className = 'resize-handle-row';
+        rowHead.appendChild(rowHandle);
+        setupRowResize(rowHandle, row);
+
         tr.appendChild(rowHead);
 
         for (let col = 0; col < COLS; col += 1) {
@@ -171,14 +349,16 @@
             'td',
             '',
             [
-              'sheet-cell h-12 min-w-36 border-b border-r border-slate-200 bg-white px-3 py-2 align-top text-slate-900 transition-colors',
-              'focus:bg-blue-50',
+              'sheet-cell border-b border-r border-slate-200 bg-white text-slate-900 transition-colors overflow-hidden',
             ].join(' ')
           );
-          td.addEventListener('blur', () => {
-            // Gi? nguy�n n?i dung ngu?i d�ng nh?p, ch? d?n kho?ng tr?ng th?a
-            td.textContent = td.textContent.trim();
-          });
+
+          td.dataset.col = String(col);
+          td.dataset.row = String(row);
+          td.style.width = `${colWidths[col]}px`;
+          td.style.minWidth = `${colWidths[col]}px`;
+          td.style.maxWidth = `${colWidths[col]}px`;
+          td.style.height = `${rowHeights[row]}px`;
 
           tr.appendChild(td);
         }
@@ -208,10 +388,7 @@
     }, { passive: false });
 
     buildTable();
-
     setZoom(DEFAULT_ZOOM);
   </script>
 </body>
 </html>
-
-
