@@ -71,23 +71,25 @@
     .resize-handle-col {
       position: absolute;
       top: 0;
-      right: -3px;
-      width: 6px;
+      right: -7px;
+      width: 14px;
       height: 100%;
       cursor: col-resize;
       user-select: none;
       z-index: 40;
+      background: transparent;
     }
 
     .resize-handle-row {
       position: absolute;
       left: 0;
-      bottom: -3px;
+      bottom: -7px;
       width: 100%;
-      height: 6px;
+      height: 14px;
       cursor: row-resize;
       user-select: none;
       z-index: 40;
+      background: transparent;
     }
 
     /* Tạo cảm giác bảng tính rõ ràng hơn */
@@ -156,7 +158,7 @@
       return name;
     }
 
-    const ROWS = 60;
+    const INITIAL_ROWS = 1;
     const COLS = 26;
     const DEFAULT_ZOOM = 100;
     const MIN_ZOOM = 50;
@@ -165,9 +167,7 @@
     const DEFAULT_COL_WIDTH = 144;
     const DEFAULT_ROW_HEIGHT = 48;
     const MIN_COL_WIDTH = 80;
-    const MAX_COL_WIDTH = 420;
     const MIN_ROW_HEIGHT = 32;
-    const MAX_ROW_HEIGHT = 240;
 
     const sheetViewport = document.getElementById('sheetViewport');
     const sheetWrap = document.getElementById('sheetWrap');
@@ -180,7 +180,7 @@
 
     let zoom = DEFAULT_ZOOM;
     const colWidths = Array.from({ length: COLS }, () => DEFAULT_COL_WIDTH);
-    const rowHeights = Array.from({ length: ROWS }, () => DEFAULT_ROW_HEIGHT);
+    const rowHeights = [];
 
     function setZoom(nextZoom) {
       zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
@@ -192,12 +192,8 @@
       zoomRange.value = String(zoom);
     }
 
-    function clamp(value, min, max) {
-      return Math.min(max, Math.max(min, value));
-    }
-
     function applyColumnWidth(colIndex, width) {
-      const nextWidth = clamp(width, MIN_COL_WIDTH, MAX_COL_WIDTH);
+      const nextWidth = Math.max(MIN_COL_WIDTH, width);
       colWidths[colIndex] = nextWidth;
 
       document.querySelectorAll(`[data-col="${colIndex}"]`).forEach((el) => {
@@ -208,7 +204,7 @@
     }
 
     function applyRowHeight(rowIndex, height) {
-      const nextHeight = clamp(height, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+      const nextHeight = Math.max(MIN_ROW_HEIGHT, height);
       rowHeights[rowIndex] = nextHeight;
 
       document.querySelectorAll(`[data-row="${rowIndex}"]`).forEach((el) => {
@@ -216,6 +212,70 @@
         el.style.minHeight = `${nextHeight}px`;
         el.style.maxHeight = `${nextHeight}px`;
       });
+    }
+
+    function rowHasContent(rowIndex) {
+      const row = tableBody.querySelector(`tr[data-row="${rowIndex}"]`);
+      if (!row) return false;
+
+      return Array.from(row.querySelectorAll('.cell-content')).some((cell) => cell.textContent.trim() !== '');
+    }
+
+    function appendBlankRow() {
+      const rowIndex = rowHeights.length;
+      rowHeights.push(DEFAULT_ROW_HEIGHT);
+
+      const tr = document.createElement('tr');
+      tr.dataset.row = String(rowIndex);
+      tr.style.height = `${DEFAULT_ROW_HEIGHT}px`;
+
+      const rowHead = document.createElement('th');
+      rowHead.dataset.rowLabel = 'true';
+      rowHead.textContent = String(rowIndex + 1);
+      rowHead.className = [
+        'relative sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500 overflow-hidden',
+      ].join(' ');
+      rowHead.style.width = '4rem';
+      rowHead.style.minWidth = '4rem';
+      rowHead.style.maxWidth = '4rem';
+      rowHead.style.height = `${DEFAULT_ROW_HEIGHT}px`;
+
+      const rowHandle = document.createElement('div');
+      rowHandle.className = 'resize-handle-row';
+      rowHead.appendChild(rowHandle);
+      setupRowResize(rowHandle, rowIndex);
+
+      tr.appendChild(rowHead);
+
+      for (let col = 0; col < COLS; col += 1) {
+        const td = createCell(
+          'td',
+          '',
+          [
+            'sheet-cell border-b border-r border-slate-200 bg-white text-slate-900 transition-colors overflow-hidden',
+          ].join(' ')
+        );
+
+        td.dataset.col = String(col);
+        td.dataset.row = String(rowIndex);
+        td.style.width = `${colWidths[col]}px`;
+        td.style.minWidth = `${colWidths[col]}px`;
+        td.style.maxWidth = `${colWidths[col]}px`;
+        td.style.height = `${DEFAULT_ROW_HEIGHT}px`;
+
+        const content = td.querySelector('.cell-content');
+        content.addEventListener('input', () => {
+          // Nếu người dùng nhập vào dòng trống cuối cùng thì tự sinh thêm một dòng mới
+          if (rowIndex === rowHeights.length - 1 && rowHasContent(rowIndex)) {
+            appendBlankRow();
+          }
+        });
+
+        tr.appendChild(td);
+      }
+
+      tableBody.appendChild(tr);
+      return tr;
     }
 
     function setupColumnResize(handle, colIndex) {
@@ -321,49 +381,8 @@
 
       tableHead.appendChild(headRow);
 
-      for (let row = 0; row < ROWS; row += 1) {
-        const tr = document.createElement('tr');
-        tr.dataset.row = String(row);
-        tr.style.height = `${rowHeights[row]}px`;
-
-        const rowHead = document.createElement('th');
-        rowHead.dataset.row = String(row);
-        rowHead.textContent = String(row + 1);
-        rowHead.className = [
-          'relative sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500 overflow-hidden',
-        ].join(' ');
-        rowHead.style.width = '4rem';
-        rowHead.style.minWidth = '4rem';
-        rowHead.style.maxWidth = '4rem';
-        rowHead.style.height = `${rowHeights[row]}px`;
-
-        const rowHandle = document.createElement('div');
-        rowHandle.className = 'resize-handle-row';
-        rowHead.appendChild(rowHandle);
-        setupRowResize(rowHandle, row);
-
-        tr.appendChild(rowHead);
-
-        for (let col = 0; col < COLS; col += 1) {
-          const td = createCell(
-            'td',
-            '',
-            [
-              'sheet-cell border-b border-r border-slate-200 bg-white text-slate-900 transition-colors overflow-hidden',
-            ].join(' ')
-          );
-
-          td.dataset.col = String(col);
-          td.dataset.row = String(row);
-          td.style.width = `${colWidths[col]}px`;
-          td.style.minWidth = `${colWidths[col]}px`;
-          td.style.maxWidth = `${colWidths[col]}px`;
-          td.style.height = `${rowHeights[row]}px`;
-
-          tr.appendChild(td);
-        }
-
-        tableBody.appendChild(tr);
+      for (let row = 0; row < INITIAL_ROWS; row += 1) {
+        appendBlankRow();
       }
     }
 
