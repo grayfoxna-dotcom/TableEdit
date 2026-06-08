@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TableEdit</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Ẩn thanh cuộn nhưng vẫn cho phép cuộn như Excel */
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Dùng lớp riêng để tách phần bảng ra khỏi khung cuộn */
+    .sheet-zoom {
+      zoom: 1;
+    }
+
+    /* Tạo cảm giác bảng tính rõ ràng hơn */
+    .sheet-cell:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 2px rgb(59 130 246 / 0.9);
+      background: rgb(239 246 255);
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden bg-slate-950 text-slate-100">
+  <div class="flex h-screen w-screen flex-col">
+    <header class="flex items-center justify-between gap-4 border-b border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur">
+      <div>
+        <h1 class="text-lg font-semibold tracking-wide">TableEdit</h1>
+        <p class="text-xs text-slate-400">Bảng toàn màn hình, chỉnh sửa trực tiếp, phóng to thu nhỏ như Excel</p>
+      </div>
+
+      <div class="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2">
+        <button id="zoomOut" class="rounded-lg bg-slate-800 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-700">
+          -
+        </button>
+        <div class="min-w-20 text-center text-sm font-medium">
+          <span id="zoomLabel">100%</span>
+        </div>
+        <button id="zoomIn" class="rounded-lg bg-slate-800 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-700">
+          +
+        </button>
+        <input id="zoomRange" type="range" min="50" max="200" value="100" class="w-36 accent-blue-500" />
+      </div>
+    </header>
+
+    <main class="relative flex-1 overflow-hidden">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.16),_transparent_35%),linear-gradient(180deg,_rgba(15,23,42,1),_rgba(2,6,23,1))]"></div>
+
+      <div class="relative flex h-full w-full flex-col p-4">
+        <div class="mb-3 flex items-center justify-between text-xs text-slate-400">
+          <span>Nhấn trực tiếp vào ô để sửa nội dung</span>
+          <span>Ctrl + cuộn chuột để đổi zoom</span>
+        </div>
+
+        <div id="sheetViewport" class="scrollbar-hide relative flex-1 overflow-auto rounded-3xl border border-slate-700 bg-slate-950/70 shadow-2xl shadow-slate-950/40">
+          <div id="sheetStage" class="relative">
+            <div id="sheetWrap" class="sheet-zoom">
+              <table class="border-separate border-spacing-0 text-sm">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Danh sách cột kiểu Excel: A, B, C ... Z, AA, AB ...
+    function getColumnName(index) {
+      let name = '';
+      let current = index + 1;
+
+      while (current > 0) {
+        const remainder = (current - 1) % 26;
+        name = String.fromCharCode(65 + remainder) + name;
+        current = Math.floor((current - 1) / 26);
+      }
+
+      return name;
+    }
+
+    const ROWS = 60;
+    const COLS = 26;
+    const DEFAULT_ZOOM = 100;
+    const MIN_ZOOM = 50;
+    const MAX_ZOOM = 200;
+    const STEP_ZOOM = 10;
+
+    const sheetViewport = document.getElementById('sheetViewport');
+    const sheetStage = document.getElementById('sheetStage');
+    const sheetWrap = document.getElementById('sheetWrap');
+    const tableHead = document.getElementById('tableHead');
+    const tableBody = document.getElementById('tableBody');
+    const zoomLabel = document.getElementById('zoomLabel');
+    const zoomRange = document.getElementById('zoomRange');
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+
+    let zoom = DEFAULT_ZOOM;
+    function setZoom(nextZoom) {
+      zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+      const scale = zoom / 100;
+
+      // Dùng zoom thay vì transform để sticky vẫn bám đúng khi cuộn
+      sheetWrap.style.zoom = String(scale);
+      zoomLabel.textContent = `${zoom}%`;
+      zoomRange.value = String(zoom);
+    }
+
+    function createCell(tagName, text, extraClasses = '') {
+      const cell = document.createElement(tagName);
+      cell.textContent = text;
+      cell.className = extraClasses;
+      cell.contentEditable = 'true';
+      cell.spellcheck = false;
+      cell.dataset.original = text;
+      return cell;
+    }
+
+    function buildTable() {
+      const headRow = document.createElement('tr');
+
+      const corner = document.createElement('th');
+      corner.textContent = '';
+      corner.className = [
+        'sticky left-0 top-0 z-30 h-10 min-w-16 border-b border-r border-slate-700 bg-slate-900 px-3 text-left text-xs font-semibold text-slate-300',
+      ].join(' ');
+      headRow.appendChild(corner);
+
+      for (let col = 0; col < COLS; col += 1) {
+        const th = document.createElement('th');
+        th.textContent = getColumnName(col);
+        th.className = [
+          'sticky top-0 z-20 h-10 min-w-36 border-b border-r border-slate-700 bg-slate-900 px-3 text-left text-xs font-semibold text-slate-300',
+        ].join(' ');
+        headRow.appendChild(th);
+      }
+
+      tableHead.appendChild(headRow);
+
+      for (let row = 0; row < ROWS; row += 1) {
+        const tr = document.createElement('tr');
+
+        const rowHead = document.createElement('th');
+        rowHead.textContent = String(row + 1);
+        rowHead.className = [
+          'sticky left-0 z-20 h-12 w-16 min-w-16 border-b border-r border-slate-700 bg-slate-900 px-3 text-left text-xs font-semibold text-slate-300',
+        ].join(' ');
+        tr.appendChild(rowHead);
+
+        for (let col = 0; col < COLS; col += 1) {
+          const td = createCell(
+            'td',
+            '',
+            [
+              'sheet-cell h-12 min-w-36 border-b border-r border-slate-800 bg-slate-950 px-3 py-2 align-top text-slate-100 transition-colors',
+              'focus:bg-blue-50',
+            ].join(' ')
+          );
+
+          td.addEventListener('focus', () => {
+            // Khi người dùng tập trung vào ô, để trống sẽ giúp nhập nhanh như Excel
+            if (td.textContent === td.dataset.original) {
+              td.textContent = '';
+            }
+          });
+
+          td.addEventListener('blur', () => {
+            // Nếu người dùng xóa hết thì trả lại trạng thái trống để giữ bảng gọn
+            td.dataset.original = td.textContent.trim();
+          });
+
+          tr.appendChild(td);
+        }
+
+        tableBody.appendChild(tr);
+      }
+    }
+
+    zoomRange.addEventListener('input', (event) => {
+      setZoom(Number(event.target.value));
+    });
+
+    zoomInBtn.addEventListener('click', () => {
+      setZoom(zoom + STEP_ZOOM);
+    });
+
+    zoomOutBtn.addEventListener('click', () => {
+      setZoom(zoom - STEP_ZOOM);
+    });
+
+    sheetViewport.addEventListener('wheel', (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+
+      const direction = event.deltaY < 0 ? 1 : -1;
+      setZoom(zoom + direction * STEP_ZOOM);
+    }, { passive: false });
+
+    buildTable();
+
+    setZoom(DEFAULT_ZOOM);
+  </script>
+</body>
+</html>
