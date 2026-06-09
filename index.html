@@ -55,6 +55,11 @@
       background: rgb(100 116 139);
     }
 
+    /* Tăng độ mượt khi cuộn bằng tay trên điện thoại */
+    .sheet-scroll {
+      -webkit-overflow-scrolling: touch;
+    }
+
     /* Dùng zoom thay vì transform để sticky hoạt động ổn hơn */
     .sheet-zoom {
       zoom: 1;
@@ -210,6 +215,13 @@
       z-index: 40;
       background: transparent;
     }
+
+    /* Màn hình nhỏ: ẩn cụm zoom vì mobile luôn chạy ở tỉ lệ 100% */
+    @media (max-width: 768px) {
+      .zoom-panel {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body class="h-screen overflow-hidden bg-slate-50 text-slate-900">
@@ -220,7 +232,7 @@
         <p class="text-xs text-slate-500">Bảng toàn màn hình, chỉnh sửa trực tiếp, phóng to thu nhỏ như Excel</p>
       </div>
 
-      <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
+      <div class="zoom-panel flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
         <button id="zoomOut" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">-</button>
         <div class="min-w-20 text-center text-sm font-medium text-slate-700"><span id="zoomLabel">100%</span></div>
         <button id="zoomIn" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">+</button>
@@ -493,12 +505,42 @@
     let zoom = DEFAULT_ZOOM;
     const colWidths = Array.from({ length: COLS }, () => DEFAULT_COL_WIDTH);
     const rowHeights = [];
+    const mobileZoomQuery = window.matchMedia('(max-width: 768px)');
+
+    // Trạng thái responsive để mobile luôn giữ 100% và không bị ảnh hưởng bởi zoom
+    function isMobileLayout() {
+      return mobileZoomQuery.matches;
+    }
 
     function setZoom(nextZoom) {
+      if (isMobileLayout()) {
+        zoom = DEFAULT_ZOOM;
+        sheetWrap.style.zoom = '1';
+        zoomLabel.textContent = `${DEFAULT_ZOOM}%`;
+        zoomRange.value = String(DEFAULT_ZOOM);
+        return;
+      }
+
       zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
       sheetWrap.style.zoom = String(zoom / 100);
       zoomLabel.textContent = `${zoom}%`;
       zoomRange.value = String(zoom);
+    }
+
+    // Đồng bộ nút zoom theo kích thước màn hình
+    function syncResponsiveZoomState() {
+      const mobile = isMobileLayout();
+
+      zoomRange.disabled = mobile;
+      zoomInBtn.disabled = mobile;
+      zoomOutBtn.disabled = mobile;
+
+      if (mobile) {
+        setZoom(DEFAULT_ZOOM);
+        return;
+      }
+
+      setZoom(zoom);
     }
 
     function applyColumnWidth(colIndex, width) {
@@ -844,7 +886,7 @@
       th.textContent = config.headerLabel || '';
       th.rowSpan = rowSpan;
       th.className = [
-        `sheet-table-header ${config.stickyClassName || ''} relative z-30 border-b border-l border-r px-3 text-center text-xs font-semibold overflow-hidden`,
+        `sheet-table-header ${config.stickyClassName || ''} relative top-0 z-30 border-b border-l border-r px-3 text-center text-xs font-semibold overflow-hidden`,
         config.className,
       ].filter(Boolean).join(' ');
       th.style.width = `${width}px`;
@@ -1246,6 +1288,7 @@
     });
 
     sheetViewport.addEventListener('wheel', (event) => {
+      if (isMobileLayout()) return;
       if (!event.ctrlKey) return;
       event.preventDefault();
 
@@ -1253,8 +1296,10 @@
       setZoom(zoom + direction * STEP_ZOOM);
     }, { passive: false });
 
+    mobileZoomQuery.addEventListener('change', syncResponsiveZoomState);
+
     buildTable();
-    setZoom(DEFAULT_ZOOM);
+    syncResponsiveZoomState();
   </script>
 </body>
 </html>
