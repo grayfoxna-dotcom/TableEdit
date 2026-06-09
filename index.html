@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
@@ -22,10 +22,6 @@
       --sheet-table-header-background-color: rgb(255, 255, 255);
       /* Màu chữ của header bảng */
       --sheet-table-header-text-color: rgb(0, 0, 0);
-      /* Màu nền của group header */
-      --sheet-table-group-header-background-color: rgb(248, 250, 252);
-      /* Màu chữ của group header */
-      --sheet-table-group-header-text-color: rgb(71, 85, 105);
       /* Màu nền riêng của cột số thứ tự */
       --sheet-table-row-number-background-color: rgb(255, 255, 255);
       /* Màu chữ riêng của cột số thứ tự */
@@ -80,11 +76,11 @@
       color: var(--sheet-table-header-text-color);
     }
 
-    /* Ô group header ở hàng trên cùng */
+    /* Ô group header ở hàng trên cùng dùng chung màu với header */
     .sheet-table-group-header {
-      background: var(--sheet-table-group-header-background-color);
+      background: var(--sheet-table-header-background-color);
       border-color: var(--sheet-table-border-color);
-      color: var(--sheet-table-group-header-text-color);
+      color: var(--sheet-table-header-text-color);
     }
 
     .sheet-row-header {
@@ -132,6 +128,11 @@
       scrollbar-width: none;
     }
 
+    /* Ẩn núm kéo mặc định của textarea để giữ giao diện phẳng như bảng tính */
+    textarea.cell-control {
+      resize: none;
+    }
+
     .cell-control[type="range"] {
       padding: 0;
       background: transparent;
@@ -157,6 +158,33 @@
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--sheet-cell-control-focus-border-color) 20%, transparent);
       border-color: var(--sheet-cell-control-focus-border-color);
       background: transparent;
+    }
+
+    /* Danh sách checkbox/radio trong một ô */
+    .cell-control-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      box-sizing: border-box;
+      scrollbar-width: none;
+    }
+
+    .cell-control-list::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cell-control-list-item {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      line-height: 1.2;
+      width: 100%;
+      min-width: 0;
+      white-space: normal;
+      word-break: break-word;
     }
 
     .resize-handle-col {
@@ -246,121 +274,212 @@
     const MIN_COL_WIDTH = 80;
     const MIN_ROW_HEIGHT = 32;
 
-    const COLUMN_SCHEMA = [
-      { type: 'text', sampleValue: 'Chữ', emptyValue: '' },
-      { type: 'textarea', sampleValue: 'Nhiều\nDòng', emptyValue: '' },
-      { type: 'number', sampleValue: '123', emptyValue: '' },
-      { type: 'date', sampleValue: '2026-06-09', emptyValue: '' },
-      { type: 'time', sampleValue: '08:30', emptyValue: '' },
-      { type: 'datetime-local', sampleValue: '2026-06-09T08:30', emptyValue: '' },
-      { type: 'email', sampleValue: 'hello@example.com', emptyValue: '' },
-      { type: 'tel', sampleValue: '0901234567', emptyValue: '' },
-      { type: 'url', sampleValue: 'https://example.com', emptyValue: '' },
-      { type: 'color', sampleValue: '#3b82f6', emptyValue: '#ffffff' },
-      { type: 'range', sampleValue: '75', emptyValue: '50', min: '0', max: '100' },
-      { type: 'checkbox', sampleValue: true, emptyValue: false },
+    // Template header được khai báo theo nhóm để nhìn vào là biết cột nào thuộc nhóm nào
+    const HEADER_TEMPLATE = [
       {
-        type: 'select',
-        sampleValue: 'B',
-        emptyValue: '',
-        options: [
-          { value: '', label: 'Chọn' },
-          { value: 'A', label: 'A' },
-          { value: 'B', label: 'B' },
-          { value: 'C', label: 'C' },
+        groupLabel: 'Thông tin cơ bản',
+        columns: [
+          { headerLabel: 'Chữ', type: 'text', sampleValue: 'Chữ', emptyValue: '' },
+          { headerLabel: 'Nhiều dòng', type: 'textarea', sampleValue: 'Nhiều\nDòng', emptyValue: '' },
+          { headerLabel: 'Số', type: 'number', sampleValue: '123', emptyValue: '' },
         ],
       },
-      { type: 'password', sampleValue: 'matkhau', emptyValue: '' },
-      { type: 'month', sampleValue: '2026-06', emptyValue: '' },
-      { type: 'week', sampleValue: '2026-W24', emptyValue: '' },
-      { type: 'search', sampleValue: 'Tìm kiếm', emptyValue: '' },
-      { type: 'text', sampleValue: 'Văn bản', emptyValue: '' },
-      { type: 'number', sampleValue: '456', emptyValue: '' },
-      { type: 'textarea', sampleValue: 'Dòng 1\nDòng 2', emptyValue: '' },
-      { type: 'date', sampleValue: '2026-06-10', emptyValue: '' },
-      { type: 'time', sampleValue: '18:45', emptyValue: '' },
       {
-        type: 'select',
-        sampleValue: 'C',
-        emptyValue: '',
-        options: [
-          { value: '', label: 'Chọn' },
-          { value: 'A', label: 'A' },
-          { value: 'B', label: 'B' },
-          { value: 'C', label: 'C' },
+        groupLabel: 'Thời gian',
+        columns: [
+          { headerLabel: 'Ngày', type: 'date', sampleValue: '2026-06-09', emptyValue: '' },
+          { headerLabel: 'Giờ', type: 'time', sampleValue: '08:30', emptyValue: '' },
+          { headerLabel: 'Ngày giờ', type: 'datetime-local', sampleValue: '2026-06-09T08:30', emptyValue: '' },
         ],
       },
-      { type: 'checkbox', sampleValue: false, emptyValue: false },
-      { type: 'url', sampleValue: 'https://openai.com', emptyValue: '' },
-      { type: 'text', sampleValue: 'Cuối dòng', emptyValue: '' },
+      {
+        groupLabel: 'Liên hệ',
+        columns: [
+          { headerLabel: 'Email', type: 'email', sampleValue: 'hello@example.com', emptyValue: '' },
+          { headerLabel: 'Điện thoại', type: 'tel', sampleValue: '0901234567', emptyValue: '' },
+          { headerLabel: 'Website', type: 'url', sampleValue: 'https://example.com', emptyValue: '' },
+        ],
+      },
+      {
+        groupLabel: 'Hiển thị',
+        columns: [
+          { headerLabel: 'Màu sắc', type: 'color', sampleValue: '#3b82f6', emptyValue: '#ffffff' },
+          { headerLabel: 'Range', type: 'range', sampleValue: '75', emptyValue: '50', min: '0', max: '100' },
+        ],
+      },
+      {
+        groupLabel: 'Trạng thái',
+        columns: [
+          { headerLabel: 'Checkbox', type: 'checkbox', sampleValue: true, emptyValue: false },
+          {
+            headerLabel: 'Checkbox list',
+            type: 'checkbox-list',
+            sampleValue: ['A', 'C'],
+            emptyValue: [],
+            options: [
+              { value: 'A', label: 'A' },
+              { value: 'B', label: 'B' },
+              { value: 'C', label: 'C' },
+              { value: 'C', label: 'C' },
+              { value: 'C', label: 'C' },
+              { value: 'C', label: 'C' },
+              { value: 'C', label: 'C' },
+              { value: 'C', label: 'C' },
+            ],
+          },
+          {
+            headerLabel: 'Select',
+            type: 'select',
+            sampleValue: 'B',
+            emptyValue: '',
+            options: [
+              { value: '', label: 'Chọn' },
+              { value: 'A', label: 'A' },
+              { value: 'B', label: 'B' },
+              { value: 'C', label: 'C' },
+            ],
+          },
+        ],
+      },
+      {
+        groupLabel: 'Bảo mật',
+        columns: [
+          { headerLabel: 'Password', type: 'password', sampleValue: 'matkhau', emptyValue: '' },
+          {
+            headerLabel: 'Radio list',
+            type: 'radio-list',
+            sampleValue: 'B',
+            emptyValue: '',
+            options: [
+              { value: 'A', label: 'Thấp' },
+              { value: 'B', label: 'Trung bình' },
+              { value: 'C', label: 'Cao' },
+            ],
+          },
+        ],
+      },
+      {
+        groupLabel: 'Thời gian',
+        columns: [
+          { headerLabel: 'Month', type: 'month', sampleValue: '2026-06', emptyValue: '' },
+          { headerLabel: 'Week', type: 'week', sampleValue: '2026-W24', emptyValue: '' },
+        ],
+      },
+      {
+        groupLabel: 'Tìm kiếm',
+        columns: [
+          { headerLabel: 'Search', type: 'search', sampleValue: 'Tìm kiếm', emptyValue: '' },
+        ],
+      },
+      {
+        groupLabel: 'Khác',
+        columns: [
+          { headerLabel: 'Văn bản', type: 'text', sampleValue: 'Văn bản', emptyValue: '' },
+          { headerLabel: 'Số 2', type: 'number', sampleValue: '456', emptyValue: '' },
+          { headerLabel: 'Textarea 2', type: 'textarea', sampleValue: 'Dòng 1\nDòng 2', emptyValue: '' },
+          { headerLabel: 'Date 2', type: 'date', sampleValue: '2026-06-10', emptyValue: '' },
+          { headerLabel: 'Time 2', type: 'time', sampleValue: '18:45', emptyValue: '' },
+          {
+            headerLabel: 'Select 2',
+            type: 'select',
+            sampleValue: 'C',
+            emptyValue: '',
+            options: [
+              { value: '', label: 'Chọn' },
+              { value: 'A', label: 'A' },
+              { value: 'B', label: 'B' },
+              { value: 'C', label: 'C' },
+            ],
+          },
+          { headerLabel: 'Checkbox 2', type: 'checkbox', sampleValue: false, emptyValue: false },
+          { headerLabel: 'URL 2', type: 'url', sampleValue: 'https://openai.com', emptyValue: '' },
+          { headerLabel: 'Cuối dòng', type: 'text', sampleValue: 'Cuối dòng', emptyValue: '' },
+        ],
+      },
     ];
 
-    // Tên cột và group header cho template mẫu
-    const COLUMN_HEADER_LABELS = [
-      'Chữ',
-      'Nhiều dòng',
-      'Số',
-      'Ngày',
-      'Giờ',
-      'Ngày giờ',
-      'Email',
-      'Điện thoại',
-      'Website',
-      'Màu sắc',
-      'Range',
-      'Checkbox',
-      'Select',
-      'Password',
-      'Month',
-      'Week',
-      'Search',
-      'Văn bản',
-      'Số 2',
-      'Textarea 2',
-      'Date 2',
-      'Time 2',
-      'Select 2',
-      'Checkbox 2',
-      'URL 2',
-      'Cuối dòng',
-    ];
+    // Bảng phẳng để render, nhưng cấu trúc gốc vẫn nằm theo nhóm để người dùng đọc dễ
+    const COLUMN_SCHEMA = HEADER_TEMPLATE.flatMap((group) =>
+      group.columns.map((column) => ({
+        ...column,
+        groupLabel: group.groupLabel,
+      })),
+    );
 
-    const COLUMN_HEADER_GROUPS = [
-      'Thông tin chung',
-      'Thông tin chung',
-      'Thông tin chung',
-      'Thời gian',
-      'Thời gian',
-      'Thời gian',
-      'Liên hệ',
-      'Liên hệ',
-      'Liên hệ',
-      'Màu sắc',
-      'Màu sắc',
-      'Trạng thái',
-      'Trạng thái',
-      'Bảo mật',
-      'Thời gian',
-      'Thời gian',
-      'Tìm kiếm',
-      'Khác',
-      'Khác',
-      'Khác',
-      'Khác',
-      'Khác',
-      'Khác',
-      'Khác',
-      'Khác',
-      'Khác',
-    ];
+    /*
+    Ví dụ custom cho từng ô nhập:
+    {
+      headerLabel: 'Mã khách hàng',
+      type: 'text',
+      sampleValue: 'KH001',
+      emptyValue: '',
+      controlId: 'customer-code',
+      controlClassName: 'bg-yellow-50',
+      controlAttributes: [
+        { name: 'required' },
+        { name: 'placeholder', value: 'Nhập mã khách hàng' },
+        { name: 'data-field', value: 'customer_code' },
+        { name: 'autocomplete', value: 'off' },
+      ],
+    }
 
-    COLUMN_SCHEMA.forEach((schema, index) => {
-      schema.headerLabel = COLUMN_HEADER_LABELS[index] || getColumnName(index);
-      schema.groupLabel = COLUMN_HEADER_GROUPS[index] || '';
-    });
+    Ví dụ ô checkbox/radio dạng list:
+    {
+      headerLabel: 'Tùy chọn',
+      type: 'checkbox-list',
+      sampleValue: ['A', 'C'],
+      emptyValue: [],
+      options: [
+        { value: 'A', label: 'A' },
+        { value: 'B', label: 'B' },
+        { value: 'C', label: 'C' },
+      ],
+    }
+
+    {
+      headerLabel: 'Mức ưu tiên',
+      type: 'radio-list',
+      sampleValue: 'B',
+      emptyValue: '',
+      options: [
+        { value: 'A', label: 'Thấp' },
+        { value: 'B', label: 'Trung bình' },
+        { value: 'C', label: 'Cao' },
+      ],
+    }
+    */
 
     // Số cột của bảng luôn bám theo template schema
     const COLS = COLUMN_SCHEMA.length;
+
+    // Cấu hình cho các cột cố định như STT và action
+    const FIXED_COLUMN_TEMPLATE = {
+      rowNumber: {
+        enabled: true,
+        headerLabel: 'STT',
+        width: 64,
+        minWidth: 48,
+        autoFit: true,
+        className: '',
+        cellClassName: '',
+        stickyClassName: 'sticky left-0',
+        valueFormatter: (rowIndex) => String(rowIndex + 1),
+      },
+      action: {
+        enabled: true,
+        headerLabel: 'Action',
+        width: 120,
+        minWidth: 120,
+        autoFit: true,
+        className: '',
+        cellClassName: '',
+        stickyClassName: 'sticky right-0',
+        buttons: [
+          { label: 'Sửa', action: 'edit', className: 'text-blue-600 hover:bg-blue-50' },
+          { label: 'Xóa', action: 'delete', className: 'text-rose-600 hover:bg-rose-50' },
+        ],
+      },
+    };
 
     const sheetViewport = document.getElementById('sheetViewport');
     const sheetWrap = document.getElementById('sheetWrap');
@@ -393,6 +512,44 @@
       });
     }
 
+    // Áp dụng độ rộng cho các cột cố định như STT và action
+    function applyFixedColumnWidth(columnKey, width) {
+      const config = FIXED_COLUMN_TEMPLATE[columnKey];
+      const nextWidth = Math.max(config?.minWidth || 48, width);
+      if (!config) return;
+
+      config.width = nextWidth;
+
+      document.querySelectorAll(`[data-fixed-column="${columnKey}"]`).forEach((el) => {
+        el.style.width = `${nextWidth}px`;
+        el.style.minWidth = `${nextWidth}px`;
+        el.style.maxWidth = `${nextWidth}px`;
+      });
+    }
+
+    // Tính độ rộng phù hợp cho cột cố định, action sẽ tự nở theo số nút
+    function getFixedColumnWidth(columnKey) {
+      const config = FIXED_COLUMN_TEMPLATE[columnKey];
+      if (!config) return 0;
+
+      if (columnKey === 'rowNumber' && config.autoFit !== false) {
+        const digits = String(Math.max(1, rowHeights.length || 1)).length;
+        return Math.max(config.minWidth || config.width || 48, digits * 8 + 24);
+      }
+
+      if (columnKey === 'action' && config.autoFit !== false) {
+        const buttons = config.buttons || [];
+        const buttonWidths = buttons.reduce((total, button) => {
+          const labelLength = String(button.label || 'Action').length;
+          return total + Math.max(44, labelLength * 8 + 22);
+        }, 0);
+        const gapWidth = Math.max(0, buttons.length - 1) * 4;
+        return Math.max(config.minWidth || config.width || 120, buttonWidths + gapWidth + 16);
+      }
+
+      return config.width || config.minWidth || 64;
+    }
+
     function applyRowHeight(rowIndex, height) {
       const nextHeight = Math.max(MIN_ROW_HEIGHT, height);
       rowHeights[rowIndex] = nextHeight;
@@ -409,6 +566,9 @@
       if (!row) return false;
 
       return Array.from(row.querySelectorAll('[data-cell-control]')).some((control) => {
+        const currentValue = getControlSerializedValue(control);
+        const initialValue = control.dataset.initialValue ?? '';
+
         if (control.type === 'checkbox' || control.type === 'radio') {
           return control.checked !== (control.dataset.initialValue === '1');
         }
@@ -423,6 +583,136 @@
 
         return String(control.value ?? '') !== String(control.dataset.initialValue ?? '');
       });
+    }
+
+    // Chuẩn hóa giá trị của control để so sánh khi row có thay đổi hay không
+    function getControlSerializedValue(control) {
+      if (!control) return '';
+
+      if (control.dataset && control.dataset.controlValue != null) {
+        return control.dataset.controlValue;
+      }
+
+      if (control.type === 'checkbox' || control.type === 'radio') {
+        return control.checked ? '1' : '0';
+      }
+
+      if (control.tagName === 'SELECT' || control.tagName === 'TEXTAREA' || 'value' in control) {
+        return String(control.value ?? '');
+      }
+
+      return '';
+    }
+
+    // Tự nới chiều cao của hàng nếu danh sách checkbox/radio cần nhiều chỗ hơn
+    function autoFitListRow(wrapper) {
+      if (!wrapper) return;
+
+      const row = wrapper.closest('tr');
+      if (!row) return;
+
+      const rowIndex = Number(row.dataset.row);
+      if (Number.isNaN(rowIndex)) return;
+
+      const rowLabelCell = row.querySelector('[data-fixed-column="rowNumber"]');
+      const actionCell = row.querySelector('[data-fixed-column="action"]');
+      const rowCell = wrapper.closest('td');
+      if (!rowCell) return;
+
+      const currentHeight = rowHeights[rowIndex] || MIN_ROW_HEIGHT;
+      const contentHeight = wrapper.scrollHeight + 12;
+      const nextHeight = Math.max(currentHeight, contentHeight);
+
+      if (nextHeight !== currentHeight) {
+        applyRowHeight(rowIndex, nextHeight);
+
+        if (rowLabelCell) {
+          rowLabelCell.style.height = `${nextHeight}px`;
+        }
+
+        if (actionCell) {
+          actionCell.style.height = `${nextHeight}px`;
+        }
+      }
+    }
+
+    // Tạo danh sách checkbox/radio trong một ô
+    function createListControl(schema, value, rowIndex) {
+      const wrapper = document.createElement('div');
+      const isCheckboxList = schema.type === 'checkbox-list';
+      const isRadioList = schema.type === 'radio-list';
+      const options = schema.options || [];
+      const controlName = schema.controlId || `${schema.type}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      wrapper.className = 'cell-control cell-control-list';
+      wrapper.dataset.cellControl = 'true';
+      wrapper.dataset.initialValue = '';
+      if (rowIndex != null) {
+        wrapper.dataset.rowIndex = String(rowIndex);
+      }
+
+      if (schema.controlId) {
+        wrapper.id = schema.controlId;
+      }
+
+      if (schema.controlClassName) {
+        wrapper.className = `${wrapper.className} ${schema.controlClassName}`.trim();
+      }
+
+      const selectedValues = isCheckboxList
+        ? new Set(Array.isArray(value) ? value.map(String) : [])
+        : new Set([String(value ?? '')]);
+
+      const syncValue = () => {
+        const nextValue = isCheckboxList
+          ? Array.from(wrapper.querySelectorAll('input[type="checkbox"][data-option-value]'))
+              .filter((input) => input.checked)
+              .map((input) => input.dataset.optionValue || '')
+          : (wrapper.querySelector('input[type="radio"]:checked')?.dataset.optionValue || '');
+
+        const serialized = isCheckboxList ? JSON.stringify(nextValue) : String(nextValue || '');
+        wrapper.dataset.controlValue = serialized;
+      };
+
+      options.forEach((option, index) => {
+        const item = document.createElement('label');
+        item.className = 'cell-control-list-item';
+
+        const input = document.createElement('input');
+        input.type = isCheckboxList ? 'checkbox' : 'radio';
+        input.name = isRadioList ? controlName : `${controlName}-${index}`;
+        input.value = option.value ?? '';
+        input.dataset.optionValue = String(option.value ?? '');
+        input.dataset.initialValue = selectedValues.has(String(option.value ?? '')) ? '1' : '0';
+        input.checked = selectedValues.has(String(option.value ?? ''));
+        input.className = isCheckboxList ? 'h-4 w-4 accent-blue-600' : 'h-4 w-4 accent-blue-600';
+
+        input.addEventListener('change', () => {
+          if (isRadioList && input.checked) {
+            wrapper.querySelectorAll('input[type="radio"][data-option-value]').forEach((other) => {
+              if (other !== input) {
+                other.checked = false;
+              }
+            });
+          }
+
+          syncValue();
+          requestAnimationFrame(() => autoFitListRow(wrapper));
+        });
+
+        const span = document.createElement('span');
+        span.textContent = option.label ?? option.value ?? '';
+
+        item.appendChild(input);
+        item.appendChild(span);
+        wrapper.appendChild(item);
+      });
+
+      syncValue();
+      wrapper.dataset.initialValue = wrapper.dataset.controlValue || '';
+      applyControlCustomization(wrapper, schema);
+      requestAnimationFrame(() => autoFitListRow(wrapper));
+      return wrapper;
     }
 
     // Gom các cột liên tiếp có cùng groupLabel để dựng group header
@@ -448,7 +738,127 @@
       return groups;
     }
 
-    function createControl(schema, value) {
+    // Áp dụng class, id và attribute tùy biến cho từng control theo schema
+    function applyControlCustomization(element, schema, extraClassName = '') {
+      if (schema.controlId) {
+        element.id = schema.controlId;
+      }
+
+      const classes = [schema.controlClassName, extraClassName].filter(Boolean).join(' ');
+      if (classes) {
+        element.className = `${element.className} ${classes}`.trim();
+      }
+
+      const attributes = schema.controlAttributes || [];
+      const normalizedAttributes = Array.isArray(attributes)
+        ? attributes
+        : Object.entries(attributes).map(([name, value]) => ({ name, value }));
+
+      normalizedAttributes.forEach((attribute) => {
+        if (!attribute) return;
+
+        if (typeof attribute === 'string') {
+          element.setAttribute(attribute, '');
+          return;
+        }
+
+        const name = attribute.name || attribute.key;
+        if (!name) return;
+
+        const value = attribute.value;
+        if (value == null) {
+          element.setAttribute(name, '');
+          return;
+        }
+
+        element.setAttribute(name, String(value));
+      });
+    }
+
+    // Tạo ô cố định phía trái cho cột STT
+    function createRowNumberCell(rowIndex, rowHeight) {
+      const cell = document.createElement('td');
+      const config = FIXED_COLUMN_TEMPLATE.rowNumber;
+      const width = getFixedColumnWidth('rowNumber');
+      cell.dataset.fixedColumn = 'rowNumber';
+      cell.dataset.rowLabel = 'true';
+      cell.textContent = config.valueFormatter ? config.valueFormatter(rowIndex) : String(rowIndex + 1);
+      cell.className = [
+        'sheet-row-header relative z-20 border-b border-r px-3 text-left text-xs font-semibold overflow-hidden',
+        config.stickyClassName,
+        config.className,
+        config.cellClassName,
+      ].filter(Boolean).join(' ');
+      cell.style.width = `${width}px`;
+      cell.style.minWidth = `${width}px`;
+      cell.style.maxWidth = `${width}px`;
+      cell.style.height = `${rowHeight}px`;
+      return cell;
+    }
+
+    // Tạo ô action cố định phía phải cho từng dòng
+    function createActionCell(rowIndex, rowHeight) {
+      const cell = document.createElement('td');
+      const config = FIXED_COLUMN_TEMPLATE.action;
+      const width = getFixedColumnWidth('action');
+      cell.dataset.fixedColumn = 'action';
+      cell.className = [
+        'sheet-table-header relative z-20 border-b border-l border-r px-2 text-xs font-semibold overflow-hidden align-middle',
+        config.stickyClassName,
+        config.className,
+        config.cellClassName,
+      ].filter(Boolean).join(' ');
+      cell.style.width = `${width}px`;
+      cell.style.minWidth = `${width}px`;
+      cell.style.maxWidth = `${width}px`;
+      cell.style.height = `${rowHeight}px`;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex h-full w-full items-center justify-center gap-1';
+
+      (config.buttons || []).forEach((buttonDef) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = buttonDef.label || 'Action';
+        button.dataset.row = String(rowIndex);
+        button.dataset.action = buttonDef.action || buttonDef.label || 'action';
+        button.className = [
+          'rounded-md px-2 py-1 text-[11px] font-medium transition',
+          buttonDef.className || 'text-slate-700 hover:bg-slate-100',
+        ].join(' ');
+        wrapper.appendChild(button);
+      });
+
+      cell.appendChild(wrapper);
+      return cell;
+    }
+
+    // Tạo ô cố định trên header cho cột STT hoặc action
+    function createFixedHeaderCell(columnKey, rowSpan) {
+      const config = FIXED_COLUMN_TEMPLATE[columnKey];
+      if (!config || !config.enabled) return null;
+      const width = getFixedColumnWidth(columnKey);
+
+      const th = document.createElement('th');
+      th.dataset.fixedColumn = columnKey;
+      th.textContent = config.headerLabel || '';
+      th.rowSpan = rowSpan;
+      th.className = [
+        `sheet-table-header ${config.stickyClassName || ''} relative z-30 border-b border-l border-r px-3 text-center text-xs font-semibold overflow-hidden`,
+        config.className,
+      ].filter(Boolean).join(' ');
+      th.style.width = `${width}px`;
+      th.style.minWidth = `${width}px`;
+      th.style.maxWidth = `${width}px`;
+      th.style.height = `${rowSpan === 2 ? '5rem' : '2.5rem'}`;
+      return th;
+    }
+
+    function createControl(schema, value, rowIndex) {
+      if (schema.type === 'checkbox-list' || schema.type === 'radio-list') {
+        return createListControl(schema, value, rowIndex);
+      }
+
       if (schema.type === 'textarea') {
         const textarea = document.createElement('textarea');
         textarea.className = 'cell-control';
@@ -456,6 +866,7 @@
         textarea.dataset.initialValue = value ?? '';
         textarea.rows = 2;
         textarea.value = value ?? '';
+        applyControlCustomization(textarea, schema);
         textarea.addEventListener('focus', () => {
           textarea.scrollTop = 0;
           textarea.scrollLeft = 0;
@@ -479,6 +890,7 @@
           select.appendChild(opt);
         });
         select.value = value ?? '';
+        applyControlCustomization(select, schema);
         return select;
       }
 
@@ -486,6 +898,23 @@
         const wrapper = document.createElement('div');
         wrapper.className = 'cell-control flex items-center justify-center';
         wrapper.style.padding = '0';
+        if (schema.controlWrapperId) {
+          wrapper.id = schema.controlWrapperId;
+        }
+        if (schema.controlWrapperClassName) {
+          wrapper.className = `${wrapper.className} ${schema.controlWrapperClassName}`.trim();
+        }
+
+        const wrapperAttributes = schema.controlWrapperAttributes || {};
+        Object.entries(wrapperAttributes).forEach(([name, value]) => {
+          if (value === false || value == null) return;
+          if (value === true) {
+            wrapper.setAttribute(name, '');
+            return;
+          }
+
+          wrapper.setAttribute(name, String(value));
+        });
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -493,6 +922,7 @@
         checkbox.dataset.cellControl = 'true';
         checkbox.dataset.initialValue = value ? '1' : '0';
         checkbox.checked = Boolean(value);
+        applyControlCustomization(checkbox, schema, 'm-0');
         wrapper.appendChild(checkbox);
         return wrapper;
       }
@@ -514,6 +944,8 @@
         input.className = 'cell-control w-full';
         input.style.padding = '0';
       }
+
+      applyControlCustomization(input, schema);
 
       input.addEventListener('focus', () => {
         input.scrollTop = 0;
@@ -551,6 +983,35 @@
       });
     }
 
+    // Resize cho group header bằng cách dàn delta đều lên toàn bộ cột trong nhóm
+    function setupGroupResize(handle, startCol, span) {
+      let startX = 0;
+      let startWidths = [];
+
+      const onMouseMove = (event) => {
+        const delta = event.clientX - startX;
+        const nextWidths = startWidths.map((width) => width + (delta / span));
+
+        for (let offset = 0; offset < span; offset += 1) {
+          applyColumnWidth(startCol + offset, nextWidths[offset]);
+        }
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      handle.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startX = event.clientX;
+        startWidths = Array.from({ length: span }, (_, offset) => colWidths[startCol + offset]);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+
     function setupRowResize(handle, rowIndex) {
       let startY = 0;
       let startHeight = 0;
@@ -583,22 +1044,14 @@
       tr.dataset.row = String(rowIndex);
       tr.style.height = `${rowHeight}px`;
 
-      const rowHead = document.createElement('th');
-      rowHead.dataset.rowLabel = 'true';
-      rowHead.textContent = String(rowIndex + 1);
-      rowHead.className = [
-        'sheet-row-header relative sticky left-0 z-20 border-b border-r px-3 text-left text-xs font-semibold overflow-hidden',
-      ].join(' ');
-      rowHead.style.width = '4rem';
-      rowHead.style.minWidth = '4rem';
-      rowHead.style.maxWidth = '4rem';
-      rowHead.style.height = `${rowHeight}px`;
-
-      const rowHandle = document.createElement('div');
-      rowHandle.className = 'resize-handle-row';
-      rowHead.appendChild(rowHandle);
-      setupRowResize(rowHandle, rowIndex);
-      tr.appendChild(rowHead);
+      if (FIXED_COLUMN_TEMPLATE.rowNumber.enabled) {
+        const rowHead = createRowNumberCell(rowIndex, rowHeight);
+        const rowHandle = document.createElement('div');
+        rowHandle.className = 'resize-handle-row';
+        rowHead.appendChild(rowHandle);
+        setupRowResize(rowHandle, rowIndex);
+        tr.appendChild(rowHead);
+      }
 
       COLUMN_SCHEMA.forEach((schema, colIndex) => {
         const td = document.createElement('td');
@@ -610,7 +1063,7 @@
         td.style.maxWidth = `${colWidths[colIndex]}px`;
         td.style.height = `${rowHeight}px`;
 
-        const control = createControl(schema, preset ? schema.sampleValue : schema.emptyValue);
+        const control = createControl(schema, preset ? schema.sampleValue : schema.emptyValue, rowIndex);
         const onValueChange = () => {
           if (rowIndex === rowHeights.length - 1 && rowHasContent(rowIndex)) {
             appendRow(false);
@@ -624,12 +1077,23 @@
         tr.appendChild(td);
       });
 
+      if (FIXED_COLUMN_TEMPLATE.action.enabled) {
+        tr.appendChild(createActionCell(rowIndex, rowHeight));
+      }
+
       tableBody.appendChild(tr);
+
+      if (FIXED_COLUMN_TEMPLATE.rowNumber.enabled) {
+        applyFixedColumnWidth('rowNumber', getFixedColumnWidth('rowNumber'));
+      }
+
       return tr;
     }
 
     function buildTable() {
       const hasGroupHeader = COLUMN_SCHEMA.some((schema) => Boolean(schema.groupLabel));
+      const fixedRowNumberWidth = getFixedColumnWidth('rowNumber');
+      const fixedActionWidth = getFixedColumnWidth('action');
 
       tableHead.replaceChildren();
       tableBody.replaceChildren();
@@ -638,29 +1102,71 @@
       if (hasGroupHeader) {
         const groupRow = document.createElement('tr');
         const columnRow = document.createElement('tr');
-        const corner = document.createElement('th');
-        corner.textContent = '';
-        corner.rowSpan = 2;
-        corner.className = [
-          'sheet-table-group-header relative sticky left-0 top-0 z-30 h-20 min-w-16 border-b border-r px-3 text-left text-xs font-semibold',
-        ].join(' ');
-        groupRow.appendChild(corner);
+        const rowNumberHeader = createFixedHeaderCell('rowNumber', 2);
+        const actionHeader = createFixedHeaderCell('action', 2);
 
-        buildHeaderGroups(COLUMN_SCHEMA).forEach((group) => {
-          const groupCell = document.createElement('th');
-          groupCell.textContent = group.label;
-          groupCell.colSpan = group.span;
-          groupCell.className = [
-            'sheet-table-group-header relative sticky top-0 z-20 h-10 border-b border-r px-3 text-center text-xs font-semibold',
-          ].join(' ');
-          groupRow.appendChild(groupCell);
-        });
+        if (rowNumberHeader) {
+          groupRow.appendChild(rowNumberHeader);
+        }
 
         for (let col = 0; col < COLS; col += 1) {
           const schema = COLUMN_SCHEMA[col] || {};
+          const groupLabel = schema.groupLabel || '';
+          const headerLabel = schema.headerLabel || getColumnName(col);
+          const prevGroupLabel = COLUMN_SCHEMA[col - 1]?.groupLabel || '';
+          const isGroupStart = Boolean(groupLabel) && groupLabel !== prevGroupLabel;
+
+          if (!groupLabel) {
+            const standaloneHeader = document.createElement('th');
+            standaloneHeader.dataset.col = String(col);
+            standaloneHeader.textContent = headerLabel;
+            standaloneHeader.rowSpan = 2;
+            standaloneHeader.className = [
+              'sheet-table-header relative sticky top-0 z-20 h-20 border-b border-r px-3 text-left text-xs font-semibold',
+            ].join(' ');
+
+            standaloneHeader.style.width = `${colWidths[col]}px`;
+            standaloneHeader.style.minWidth = `${colWidths[col]}px`;
+            standaloneHeader.style.maxWidth = `${colWidths[col]}px`;
+
+            const handle = document.createElement('div');
+            handle.className = 'resize-handle-col';
+            standaloneHeader.appendChild(handle);
+            setupColumnResize(handle, col);
+
+            groupRow.appendChild(standaloneHeader);
+            continue;
+          }
+
+          if (isGroupStart) {
+            let span = 1;
+            while (
+              col + span < COLS &&
+              (COLUMN_SCHEMA[col + span]?.groupLabel || '') === groupLabel
+            ) {
+              span += 1;
+            }
+
+            const groupCell = document.createElement('th');
+            groupCell.textContent = groupLabel;
+            groupCell.colSpan = span;
+            groupCell.className = [
+              'sheet-table-group-header relative sticky top-0 z-20 h-10 border-b border-r px-3 text-center text-xs font-semibold',
+            ].join(' ');
+
+            if (span > 1) {
+              const groupHandle = document.createElement('div');
+              groupHandle.className = 'resize-handle-col';
+              groupCell.appendChild(groupHandle);
+              setupGroupResize(groupHandle, col, span);
+            }
+
+            groupRow.appendChild(groupCell);
+          }
+
           const th = document.createElement('th');
           th.dataset.col = String(col);
-          th.textContent = schema.headerLabel || getColumnName(col);
+          th.textContent = headerLabel;
           th.className = [
             'sheet-table-header relative sticky top-10 z-20 h-10 border-b border-r px-3 text-left text-xs font-semibold',
           ].join(' ');
@@ -677,16 +1183,20 @@
           columnRow.appendChild(th);
         }
 
+        if (actionHeader) {
+          groupRow.appendChild(actionHeader);
+        }
+
         tableHead.appendChild(groupRow);
         tableHead.appendChild(columnRow);
       } else {
         const headRow = document.createElement('tr');
-        const corner = document.createElement('th');
-        corner.textContent = '';
-        corner.className = [
-          'sheet-table-header relative sticky left-0 top-0 z-30 h-10 min-w-16 border-b border-r px-3 text-left text-xs font-semibold',
-        ].join(' ');
-        headRow.appendChild(corner);
+        const rowNumberHeader = createFixedHeaderCell('rowNumber', 1);
+        const actionHeader = createFixedHeaderCell('action', 1);
+
+        if (rowNumberHeader) {
+          headRow.appendChild(rowNumberHeader);
+        }
 
         for (let col = 0; col < COLS; col += 1) {
           const schema = COLUMN_SCHEMA[col] || {};
@@ -709,8 +1219,15 @@
           headRow.appendChild(th);
         }
 
+        if (actionHeader) {
+          headRow.appendChild(actionHeader);
+        }
+
         tableHead.appendChild(headRow);
       }
+
+      applyFixedColumnWidth('rowNumber', fixedRowNumberWidth);
+      applyFixedColumnWidth('action', fixedActionWidth);
 
       appendRow(true);
       appendRow(false);
@@ -741,3 +1258,4 @@
   </script>
 </body>
 </html>
+
