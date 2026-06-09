@@ -8,14 +8,30 @@
   <style>
     /* Chỉnh màu viền và màu focus của ô nhập ở đây */
     :root {
-      /* Màu viền mặc định của ô nhập */
-      --sheet-cell-border-color: rgb(255, 255, 255);
-      /* Màu nền mặc định của ô nhập */
+      /* Màu nền mặc định của ô trên bảng */
       --sheet-cell-background-color: rgb(255, 255, 255);
-      /* Màu viền khi ô đang được focus */
-      --sheet-cell-focus-border-color: rgb(37 99 235);
-      /* Màu nền khi ô đang được focus */
-      --sheet-cell-focus-background-color: rgb(255, 255, 255);
+      /* Màu nền mặc định của control nhập bên trong ô */
+      --sheet-cell-control-background-color: rgb(255, 255, 255);
+      /* Màu viền mặc định của control nhập bên trong ô */
+      --sheet-cell-control-border-color: rgb(255, 255, 255);
+      /* Màu viền khi control nhập đang focus */
+      --sheet-cell-control-focus-border-color: rgb(37 99 235);
+      /* Màu nền khi control nhập đang focus */
+      --sheet-cell-control-focus-background-color: rgb(255, 255, 255);
+      /* Màu nền của header bảng */
+      --sheet-table-header-background-color: rgb(255, 255, 255);
+      /* Màu chữ của header bảng */
+      --sheet-table-header-text-color: rgb(0, 0, 0);
+      /* Màu nền của group header */
+      --sheet-table-group-header-background-color: rgb(248, 250, 252);
+      /* Màu chữ của group header */
+      --sheet-table-group-header-text-color: rgb(71, 85, 105);
+      /* Màu nền riêng của cột số thứ tự */
+      --sheet-table-row-number-background-color: rgb(255, 255, 255);
+      /* Màu chữ riêng của cột số thứ tự */
+      --sheet-table-row-number-text-color: rgb(0, 0, 0);
+      /* Màu viền chung của bảng */
+      --sheet-table-border-color: rgb(236, 236, 236);
     }
 
     /* Thanh cuộn chính của bảng */
@@ -55,6 +71,37 @@
       overflow: hidden;
       vertical-align: top;
       background: var(--sheet-cell-background-color);
+      border-color: var(--sheet-table-border-color);
+    }
+
+    .sheet-table-header {
+      background: var(--sheet-table-header-background-color);
+      border-color: var(--sheet-table-border-color);
+      color: var(--sheet-table-header-text-color);
+    }
+
+    /* Ô group header ở hàng trên cùng */
+    .sheet-table-group-header {
+      background: var(--sheet-table-group-header-background-color);
+      border-color: var(--sheet-table-border-color);
+      color: var(--sheet-table-group-header-text-color);
+    }
+
+    .sheet-row-header {
+      background: var(--sheet-table-row-number-background-color);
+      border-color: var(--sheet-table-border-color);
+      color: var(--sheet-table-row-number-text-color);
+    }
+
+    .sheet-corner-cell {
+      background: var(--sheet-table-header-background-color);
+      border-color: var(--sheet-table-border-color);
+      color: var(--sheet-table-header-text-color);
+    }
+
+    /* Viền ngoài khung bảng dùng chung màu với viền của các ô */
+    #sheetViewport {
+      border-color: var(--sheet-table-border-color);
     }
 
     .cell-control {
@@ -62,9 +109,9 @@
       width: 100%;
       height: 100%;
       box-sizing: border-box;
-      border: 1px solid var(--sheet-cell-border-color);
+      border: 1px solid var(--sheet-cell-control-border-color);
       border-radius: 0;
-      background: var(--sheet-cell-background-color);
+      background: var(--sheet-cell-control-background-color);
       padding: 0.2rem 0.35rem;
       font-size: 0.875rem;
       color: rgb(15 23 42);
@@ -72,9 +119,9 @@
     }
 
     .cell-control:focus {
-      border-color: var(--sheet-cell-focus-border-color);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheet-cell-focus-border-color) 35%, transparent);
-      background: var(--sheet-cell-focus-background-color);
+      border-color: var(--sheet-cell-control-focus-border-color);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheet-cell-control-focus-border-color) 35%, transparent);
+      background: var(--sheet-cell-control-focus-background-color);
     }
 
     .cell-control::-webkit-scrollbar {
@@ -103,12 +150,12 @@
       margin: 0;
       padding: 0;
       border-radius: 0;
-      border: 1px solid var(--sheet-cell-border-color);
+      border: 1px solid var(--sheet-cell-control-border-color);
     }
 
     .cell-control[type="checkbox"]:focus {
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--sheet-cell-focus-border-color) 20%, transparent);
-      border-color: var(--sheet-cell-focus-border-color);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--sheet-cell-control-focus-border-color) 20%, transparent);
+      border-color: var(--sheet-cell-control-focus-border-color);
       background: transparent;
     }
 
@@ -160,7 +207,7 @@
           <span>Ctrl + cuộn chuột để đổi zoom</span>
         </div>
 
-        <div id="sheetViewport" class="sheet-scroll relative flex-1 overflow-auto border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
+        <div id="sheetViewport" class="sheet-scroll relative flex-1 overflow-auto border bg-white shadow-xl shadow-slate-200/60">
           <div id="sheetStage" class="relative">
             <div id="sheetWrap" class="sheet-zoom">
               <table class="w-max table-fixed border-separate border-spacing-0 text-sm">
@@ -189,7 +236,6 @@
       return name;
     }
 
-    const COLS = 26;
     const DEFAULT_ZOOM = 100;
     const MIN_ZOOM = 50;
     const MAX_ZOOM = 200;
@@ -248,6 +294,73 @@
       { type: 'url', sampleValue: 'https://openai.com', emptyValue: '' },
       { type: 'text', sampleValue: 'Cuối dòng', emptyValue: '' },
     ];
+
+    // Tên cột và group header cho template mẫu
+    const COLUMN_HEADER_LABELS = [
+      'Chữ',
+      'Nhiều dòng',
+      'Số',
+      'Ngày',
+      'Giờ',
+      'Ngày giờ',
+      'Email',
+      'Điện thoại',
+      'Website',
+      'Màu sắc',
+      'Range',
+      'Checkbox',
+      'Select',
+      'Password',
+      'Month',
+      'Week',
+      'Search',
+      'Văn bản',
+      'Số 2',
+      'Textarea 2',
+      'Date 2',
+      'Time 2',
+      'Select 2',
+      'Checkbox 2',
+      'URL 2',
+      'Cuối dòng',
+    ];
+
+    const COLUMN_HEADER_GROUPS = [
+      'Thông tin chung',
+      'Thông tin chung',
+      'Thông tin chung',
+      'Thời gian',
+      'Thời gian',
+      'Thời gian',
+      'Liên hệ',
+      'Liên hệ',
+      'Liên hệ',
+      'Màu sắc',
+      'Màu sắc',
+      'Trạng thái',
+      'Trạng thái',
+      'Bảo mật',
+      'Thời gian',
+      'Thời gian',
+      'Tìm kiếm',
+      'Khác',
+      'Khác',
+      'Khác',
+      'Khác',
+      'Khác',
+      'Khác',
+      'Khác',
+      'Khác',
+      'Khác',
+    ];
+
+    COLUMN_SCHEMA.forEach((schema, index) => {
+      schema.headerLabel = COLUMN_HEADER_LABELS[index] || getColumnName(index);
+      schema.groupLabel = COLUMN_HEADER_GROUPS[index] || '';
+    });
+
+    // Số cột của bảng luôn bám theo template schema
+    const COLS = COLUMN_SCHEMA.length;
 
     const sheetViewport = document.getElementById('sheetViewport');
     const sheetWrap = document.getElementById('sheetWrap');
@@ -310,6 +423,29 @@
 
         return String(control.value ?? '') !== String(control.dataset.initialValue ?? '');
       });
+    }
+
+    // Gom các cột liên tiếp có cùng groupLabel để dựng group header
+    function buildHeaderGroups(schemaList) {
+      const groups = [];
+      let index = 0;
+
+      while (index < schemaList.length) {
+        const label = schemaList[index]?.groupLabel || '';
+        let span = 1;
+
+        while (
+          index + span < schemaList.length &&
+          (schemaList[index + span]?.groupLabel || '') === label
+        ) {
+          span += 1;
+        }
+
+        groups.push({ label, span });
+        index += span;
+      }
+
+      return groups;
     }
 
     function createControl(schema, value) {
@@ -451,7 +587,7 @@
       rowHead.dataset.rowLabel = 'true';
       rowHead.textContent = String(rowIndex + 1);
       rowHead.className = [
-        'relative sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500 overflow-hidden',
+        'sheet-row-header relative sticky left-0 z-20 border-b border-r px-3 text-left text-xs font-semibold overflow-hidden',
       ].join(' ');
       rowHead.style.width = '4rem';
       rowHead.style.minWidth = '4rem';
@@ -466,7 +602,7 @@
 
       COLUMN_SCHEMA.forEach((schema, colIndex) => {
         const td = document.createElement('td');
-        td.className = 'sheet-cell border-b border-r border-slate-200 bg-white text-slate-900 overflow-hidden';
+        td.className = 'sheet-cell border-b border-r text-slate-900 overflow-hidden';
         td.dataset.col = String(colIndex);
         td.dataset.row = String(rowIndex);
         td.style.width = `${colWidths[colIndex]}px`;
@@ -493,36 +629,89 @@
     }
 
     function buildTable() {
-      const headRow = document.createElement('tr');
+      const hasGroupHeader = COLUMN_SCHEMA.some((schema) => Boolean(schema.groupLabel));
 
-      const corner = document.createElement('th');
-      corner.textContent = '';
-      corner.className = [
-        'relative sticky left-0 top-0 z-30 h-10 min-w-16 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
-      ].join(' ');
-      headRow.appendChild(corner);
+      tableHead.replaceChildren();
+      tableBody.replaceChildren();
+      rowHeights.length = 0;
 
-      for (let col = 0; col < COLS; col += 1) {
-        const th = document.createElement('th');
-        th.dataset.col = String(col);
-        th.textContent = getColumnName(col);
-        th.className = [
-          'relative sticky top-0 z-20 h-10 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500',
+      if (hasGroupHeader) {
+        const groupRow = document.createElement('tr');
+        const columnRow = document.createElement('tr');
+        const corner = document.createElement('th');
+        corner.textContent = '';
+        corner.rowSpan = 2;
+        corner.className = [
+          'sheet-table-group-header relative sticky left-0 top-0 z-30 h-20 min-w-16 border-b border-r px-3 text-left text-xs font-semibold',
         ].join(' ');
+        groupRow.appendChild(corner);
 
-        th.style.width = `${colWidths[col]}px`;
-        th.style.minWidth = `${colWidths[col]}px`;
-        th.style.maxWidth = `${colWidths[col]}px`;
+        buildHeaderGroups(COLUMN_SCHEMA).forEach((group) => {
+          const groupCell = document.createElement('th');
+          groupCell.textContent = group.label;
+          groupCell.colSpan = group.span;
+          groupCell.className = [
+            'sheet-table-group-header relative sticky top-0 z-20 h-10 border-b border-r px-3 text-center text-xs font-semibold',
+          ].join(' ');
+          groupRow.appendChild(groupCell);
+        });
 
-        const handle = document.createElement('div');
-        handle.className = 'resize-handle-col';
-        th.appendChild(handle);
-        setupColumnResize(handle, col);
+        for (let col = 0; col < COLS; col += 1) {
+          const schema = COLUMN_SCHEMA[col] || {};
+          const th = document.createElement('th');
+          th.dataset.col = String(col);
+          th.textContent = schema.headerLabel || getColumnName(col);
+          th.className = [
+            'sheet-table-header relative sticky top-10 z-20 h-10 border-b border-r px-3 text-left text-xs font-semibold',
+          ].join(' ');
 
-        headRow.appendChild(th);
+          th.style.width = `${colWidths[col]}px`;
+          th.style.minWidth = `${colWidths[col]}px`;
+          th.style.maxWidth = `${colWidths[col]}px`;
+
+          const handle = document.createElement('div');
+          handle.className = 'resize-handle-col';
+          th.appendChild(handle);
+          setupColumnResize(handle, col);
+
+          columnRow.appendChild(th);
+        }
+
+        tableHead.appendChild(groupRow);
+        tableHead.appendChild(columnRow);
+      } else {
+        const headRow = document.createElement('tr');
+        const corner = document.createElement('th');
+        corner.textContent = '';
+        corner.className = [
+          'sheet-table-header relative sticky left-0 top-0 z-30 h-10 min-w-16 border-b border-r px-3 text-left text-xs font-semibold',
+        ].join(' ');
+        headRow.appendChild(corner);
+
+        for (let col = 0; col < COLS; col += 1) {
+          const schema = COLUMN_SCHEMA[col] || {};
+          const th = document.createElement('th');
+          th.dataset.col = String(col);
+          th.textContent = schema.headerLabel || getColumnName(col);
+          th.className = [
+            'sheet-table-header relative sticky top-0 z-20 h-10 border-b border-r px-3 text-left text-xs font-semibold',
+          ].join(' ');
+
+          th.style.width = `${colWidths[col]}px`;
+          th.style.minWidth = `${colWidths[col]}px`;
+          th.style.maxWidth = `${colWidths[col]}px`;
+
+          const handle = document.createElement('div');
+          handle.className = 'resize-handle-col';
+          th.appendChild(handle);
+          setupColumnResize(handle, col);
+
+          headRow.appendChild(th);
+        }
+
+        tableHead.appendChild(headRow);
       }
 
-      tableHead.appendChild(headRow);
       appendRow(true);
       appendRow(false);
     }
