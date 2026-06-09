@@ -222,6 +222,130 @@
         display: none;
       }
     }
+
+    /* Chế độ mobile được JS gắn vào body để chủ động bật/tắt layout */
+    body.is-mobile-layout .zoom-panel {
+      display: none !important;
+    }
+
+    body.is-mobile-layout #sheetViewport {
+      display: none !important;
+    }
+
+    body.is-mobile-layout .mobile-form-viewport {
+      display: block !important;
+    }
+
+    /* Chế độ form trên điện thoại */
+    .mobile-form-viewport {
+      display: none;
+      padding: 1rem;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .mobile-form-section {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .mobile-row-card {
+      display: grid;
+      gap: 0.85rem;
+      padding: 1rem;
+      border: 1px solid var(--sheet-table-border-color);
+      background: rgb(255 255 255);
+    }
+
+    .mobile-row-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: rgb(15 23 42);
+    }
+
+    .mobile-fieldset {
+      display: grid;
+      gap: 0.75rem;
+      padding: 0.85rem;
+      border: 1px solid var(--sheet-table-border-color);
+      background: rgb(248 250 252);
+    }
+
+    .mobile-fieldset > legend {
+      padding: 0 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--sheet-table-header-text-color);
+    }
+
+    .mobile-field-row {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .mobile-field-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: rgb(71 85 105);
+    }
+
+    /* Tăng cảm giác như form thật khi xem trên điện thoại */
+    .mobile-form-viewport .cell-control {
+      min-height: 3rem;
+      height: auto;
+      border-radius: 0.875rem;
+      border-color: rgb(226 232 240);
+      background: rgb(255 255 255);
+      padding: 0.8rem 0.9rem;
+      font-size: 0.95rem;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    .mobile-form-viewport .cell-control:focus {
+      box-shadow:
+        0 0 0 3px rgb(59 130 246 / 0.14),
+        0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    .mobile-form-viewport textarea.cell-control {
+      min-height: 5.25rem;
+      line-height: 1.5;
+    }
+
+    .mobile-form-viewport .cell-control[type="range"] {
+      min-height: 0;
+      height: auto;
+      padding: 0;
+      box-shadow: none;
+      border-color: transparent;
+    }
+
+    .mobile-form-viewport .cell-control[type="color"] {
+      min-height: 3.25rem;
+      padding: 0.25rem;
+    }
+
+    .mobile-field-row-checkbox {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 0.95rem;
+      border: 1px solid rgb(226 232 240);
+      border-radius: 0.875rem;
+      background: rgb(255 255 255);
+      box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    .mobile-field-row-checkbox .mobile-field-label {
+      margin: 0;
+    }
+
+    .mobile-checkbox-control {
+      width: 1.35rem;
+      height: 1.35rem;
+      margin: 0;
+      accent-color: rgb(37 99 235);
+    }
   </style>
 </head>
 <body class="h-screen overflow-hidden bg-slate-50 text-slate-900">
@@ -257,6 +381,8 @@
             </div>
           </div>
         </div>
+
+        <div id="mobileFormViewport" class="mobile-form-viewport flex-1 overflow-auto border bg-white shadow-xl shadow-slate-200/60"></div>
       </div>
     </main>
   </div>
@@ -494,6 +620,7 @@
     };
 
     const sheetViewport = document.getElementById('sheetViewport');
+    const mobileFormViewport = document.getElementById('mobileFormViewport');
     const sheetWrap = document.getElementById('sheetWrap');
     const tableHead = document.getElementById('tableHead');
     const tableBody = document.getElementById('tableBody');
@@ -509,7 +636,8 @@
 
     // Trạng thái responsive để mobile luôn giữ 100% và không bị ảnh hưởng bởi zoom
     function isMobileLayout() {
-      return mobileZoomQuery.matches;
+      // Ưu tiên màn hình nhỏ và thiết bị chạm để chuyển sang form mobile
+      return mobileZoomQuery.matches || window.matchMedia('(pointer: coarse)').matches;
     }
 
     function setZoom(nextZoom) {
@@ -530,6 +658,7 @@
     // Đồng bộ nút zoom theo kích thước màn hình
     function syncResponsiveZoomState() {
       const mobile = isMobileLayout();
+      document.body.classList.toggle('is-mobile-layout', mobile);
 
       zoomRange.disabled = mobile;
       zoomInBtn.disabled = mobile;
@@ -537,7 +666,12 @@
 
       if (mobile) {
         setZoom(DEFAULT_ZOOM);
+        renderMobileForm();
         return;
+      }
+
+      if (mobileFormViewport) {
+        mobileFormViewport.replaceChildren();
       }
 
       setZoom(zoom);
@@ -646,6 +780,193 @@
       return '';
     }
 
+    // Lấy giá trị hiện tại của control theo kiểu dữ liệu để đưa sang form mobile
+    function getControlValue(control, schema) {
+      if (!control) return schema.type === 'checkbox-list' ? [] : '';
+
+      if (schema.type === 'checkbox-list') {
+        const rawValue = control.dataset.controlValue || control.dataset.initialValue || '[]';
+        try {
+          return JSON.parse(rawValue);
+        } catch (error) {
+          return [];
+        }
+      }
+
+      if (schema.type === 'radio-list') {
+        return control.dataset.controlValue || control.dataset.initialValue || '';
+      }
+
+      if (schema.type === 'checkbox') {
+        const checkbox = control.matches('input[type="checkbox"]')
+          ? control
+          : control.querySelector('input[type="checkbox"]');
+        return Boolean(checkbox?.checked);
+      }
+
+      if (schema.type === 'select' || schema.type === 'textarea' || 'value' in control) {
+        return control.value ?? '';
+      }
+
+      return '';
+    }
+
+    // Ghi giá trị từ form mobile ngược lại control trong bảng
+    function setControlValue(control, schema, value) {
+      if (!control) return;
+
+      if (schema.type === 'checkbox-list') {
+        const selectedValues = new Set(Array.isArray(value) ? value.map(String) : []);
+        control.querySelectorAll('input[type="checkbox"][data-option-value]').forEach((input) => {
+          input.checked = selectedValues.has(input.dataset.optionValue || '');
+        });
+
+        control.dataset.controlValue = JSON.stringify(Array.from(selectedValues));
+        return;
+      }
+
+      if (schema.type === 'radio-list') {
+        const nextValue = String(value ?? '');
+        control.querySelectorAll('input[type="radio"][data-option-value]').forEach((input) => {
+          input.checked = (input.dataset.optionValue || '') === nextValue;
+        });
+
+        control.dataset.controlValue = nextValue;
+        return;
+      }
+
+      if (schema.type === 'checkbox') {
+        const checkbox = control.matches('input[type="checkbox"]')
+          ? control
+          : control.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          checkbox.checked = Boolean(value);
+        }
+        return;
+      }
+
+      if ('value' in control) {
+        control.value = value ?? '';
+      }
+    }
+
+    // Tìm control tương ứng trong bảng theo dòng và cột
+    function getTableCellControl(rowIndex, colIndex) {
+      const cell = tableBody.querySelector(`tr[data-row="${rowIndex}"] td[data-col="${colIndex}"]`);
+      if (!cell) return null;
+
+      return cell.querySelector('[data-cell-control]');
+    }
+
+    // Tạo view form riêng cho điện thoại theo kiểu mỗi ô nhập là một field độc lập
+    function renderMobileForm() {
+      if (!mobileFormViewport) return;
+
+      mobileFormViewport.replaceChildren();
+
+      if (!isMobileLayout()) return;
+
+      const form = document.createElement('div');
+      form.className = 'mobile-form-section';
+
+      const rowElements = Array.from(tableBody.querySelectorAll('tr[data-row]'));
+
+      rowElements.forEach((rowEl, rowIndex) => {
+        const logicalRowIndex = Number(rowEl.dataset.row);
+        if (Number.isNaN(logicalRowIndex)) return;
+
+        const rowCard = document.createElement('section');
+        rowCard.className = 'mobile-row-card';
+
+        const rowTitle = document.createElement('div');
+        rowTitle.className = 'mobile-row-title';
+        rowTitle.textContent = `Dòng ${logicalRowIndex + 1}`;
+        rowCard.appendChild(rowTitle);
+
+        let flatColIndex = 0;
+
+        HEADER_TEMPLATE.forEach((group) => {
+          const groupBox = document.createElement(group.groupLabel ? 'fieldset' : 'div');
+          groupBox.className = 'mobile-fieldset';
+
+          if (group.groupLabel) {
+            const legend = document.createElement('legend');
+            legend.textContent = group.groupLabel;
+            groupBox.appendChild(legend);
+          }
+
+          group.columns.forEach((column) => {
+            const colIndex = flatColIndex;
+            flatColIndex += 1;
+            if (colIndex < 0) return;
+
+            const fieldRow = document.createElement('div');
+            fieldRow.className = 'mobile-field-row';
+            if (column.type === 'checkbox') {
+              fieldRow.classList.add('mobile-field-row-checkbox');
+            }
+
+            const label = document.createElement('label');
+            label.className = 'mobile-field-label';
+            label.textContent = column.headerLabel || getColumnName(colIndex);
+            label.htmlFor = `mobile-${logicalRowIndex}-${colIndex}`;
+
+            const tableControl = getTableCellControl(logicalRowIndex, colIndex);
+            const currentValue = getControlValue(tableControl, column);
+            let mobileControl = null;
+
+            if (column.type === 'checkbox') {
+              mobileControl = document.createElement('input');
+              mobileControl.type = 'checkbox';
+              mobileControl.className = 'mobile-checkbox-control';
+              mobileControl.id = `mobile-${logicalRowIndex}-${colIndex}`;
+              mobileControl.checked = Boolean(currentValue);
+              mobileControl.setAttribute('aria-label', column.headerLabel || getColumnName(colIndex));
+            } else {
+              mobileControl = createControl(column, currentValue, logicalRowIndex);
+
+              if (mobileControl && mobileControl.id) {
+                mobileControl.id = `mobile-${logicalRowIndex}-${colIndex}`;
+              } else if (mobileControl) {
+                mobileControl.id = `mobile-${logicalRowIndex}-${colIndex}`;
+              }
+            }
+
+            const syncToTable = () => {
+              const beforeRowCount = tableBody.querySelectorAll('tr[data-row]').length;
+              const nextValue = column.type === 'checkbox'
+                ? Boolean(mobileControl.checked)
+                : getControlValue(mobileControl, column);
+              setControlValue(tableControl, column, nextValue);
+
+              if (tableControl) {
+                tableControl.dispatchEvent(new Event('input', { bubbles: true }));
+                tableControl.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+
+              const afterRowCount = tableBody.querySelectorAll('tr[data-row]').length;
+              if (afterRowCount !== beforeRowCount && isMobileLayout()) {
+                renderMobileForm();
+              }
+            };
+
+            mobileControl.addEventListener('input', syncToTable);
+            mobileControl.addEventListener('change', syncToTable);
+
+            fieldRow.appendChild(label);
+            fieldRow.appendChild(mobileControl);
+            groupBox.appendChild(fieldRow);
+          });
+
+          rowCard.appendChild(groupBox);
+        });
+
+        form.appendChild(rowCard);
+      });
+
+      mobileFormViewport.appendChild(form);
+    }
+
     // Tự nới chiều cao của hàng nếu danh sách checkbox/radio cần nhiều chỗ hơn
     function autoFitListRow(wrapper) {
       if (!wrapper) return;
@@ -684,7 +1005,9 @@
       const isCheckboxList = schema.type === 'checkbox-list';
       const isRadioList = schema.type === 'radio-list';
       const options = schema.options || [];
-      const controlName = schema.controlId || `${schema.type}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const controlName = schema.controlId
+        ? `${schema.controlId}-${rowIndex ?? 'row'}`
+        : `${schema.type}-${rowIndex ?? 'row'}-${Math.random().toString(36).slice(2)}`;
 
       wrapper.className = 'cell-control cell-control-list';
       wrapper.dataset.cellControl = 'true';
@@ -1297,6 +1620,7 @@
     }, { passive: false });
 
     mobileZoomQuery.addEventListener('change', syncResponsiveZoomState);
+    window.addEventListener('resize', syncResponsiveZoomState);
 
     buildTable();
     syncResponsiveZoomState();
