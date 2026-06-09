@@ -6,7 +6,19 @@
   <title>TableEdit</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Làm thanh cuộn ngang/dọc dễ nhìn hơn trên trình duyệt */
+    /* Chỉnh màu viền và màu focus của ô nhập ở đây */
+    :root {
+      /* Màu viền mặc định của ô nhập */
+      --sheet-cell-border-color: rgb(255, 255, 255);
+      /* Màu nền mặc định của ô nhập */
+      --sheet-cell-background-color: rgb(255, 255, 255);
+      /* Màu viền khi ô đang được focus */
+      --sheet-cell-focus-border-color: rgb(37 99 235);
+      /* Màu nền khi ô đang được focus */
+      --sheet-cell-focus-background-color: rgb(255, 255, 255);
+    }
+
+    /* Thanh cuộn chính của bảng */
     .sheet-scroll {
       scrollbar-width: thin;
       scrollbar-color: rgb(148 163 184) rgb(241 245 249);
@@ -31,7 +43,7 @@
       background: rgb(100 116 139);
     }
 
-    /* Dùng zoom thay vì transform để sticky vẫn bám đúng khi cuộn */
+    /* Dùng zoom thay vì transform để sticky hoạt động ổn hơn */
     .sheet-zoom {
       zoom: 1;
     }
@@ -42,30 +54,62 @@
       height: 3rem;
       overflow: hidden;
       vertical-align: top;
+      background: var(--sheet-cell-background-color);
     }
 
-    .cell-content {
+    .cell-control {
       display: block;
       width: 100%;
       height: 100%;
-      padding: 0.5rem 0.75rem;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
       box-sizing: border-box;
-      line-height: 1.5rem;
-      max-height: 100%;
-      scrollbar-width: none;
+      border: 1px solid var(--sheet-cell-border-color);
+      border-radius: 0;
+      background: var(--sheet-cell-background-color);
+      padding: 0.2rem 0.35rem;
+      font-size: 0.875rem;
+      color: rgb(15 23 42);
+      outline: none;
     }
 
-    .cell-content::-webkit-scrollbar {
+    .cell-control:focus {
+      border-color: var(--sheet-cell-focus-border-color);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheet-cell-focus-border-color) 35%, transparent);
+      background: var(--sheet-cell-focus-background-color);
+    }
+
+    .cell-control::-webkit-scrollbar {
       display: none;
     }
 
-    .cell-content:focus {
-      outline: none;
-      box-shadow: inset 0 0 0 2px rgb(59 130 246 / 0.9);
-      background: rgb(239 246 255);
+    .cell-control {
+      scrollbar-width: none;
+    }
+
+    .cell-control[type="range"] {
+      padding: 0;
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .cell-control[type="color"] {
+      padding: 0;
+      border-color: transparent;
+      background: transparent;
+    }
+
+    .cell-control[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+      border: 1px solid var(--sheet-cell-border-color);
+    }
+
+    .cell-control[type="checkbox"]:focus {
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--sheet-cell-focus-border-color) 20%, transparent);
+      border-color: var(--sheet-cell-focus-border-color);
+      background: transparent;
     }
 
     .resize-handle-col {
@@ -91,13 +135,6 @@
       z-index: 40;
       background: transparent;
     }
-
-    /* Tạo cảm giác bảng tính rõ ràng hơn */
-    .sheet-cell:focus {
-      outline: none;
-      box-shadow: inset 0 0 0 2px rgb(59 130 246 / 0.9);
-      background: rgb(239 246 255);
-    }
   </style>
 </head>
 <body class="h-screen overflow-hidden bg-slate-50 text-slate-900">
@@ -109,15 +146,9 @@
       </div>
 
       <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
-        <button id="zoomOut" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">
-          -
-        </button>
-        <div class="min-w-20 text-center text-sm font-medium text-slate-700">
-          <span id="zoomLabel">100%</span>
-        </div>
-        <button id="zoomIn" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">
-          +
-        </button>
+        <button id="zoomOut" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">-</button>
+        <div class="min-w-20 text-center text-sm font-medium text-slate-700"><span id="zoomLabel">100%</span></div>
+        <button id="zoomIn" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">+</button>
         <input id="zoomRange" type="range" min="50" max="200" value="100" class="w-36 accent-blue-500" />
       </div>
     </header>
@@ -158,7 +189,6 @@
       return name;
     }
 
-    const INITIAL_ROWS = 1;
     const COLS = 26;
     const DEFAULT_ZOOM = 100;
     const MIN_ZOOM = 50;
@@ -166,8 +196,58 @@
     const STEP_ZOOM = 10;
     const DEFAULT_COL_WIDTH = 144;
     const DEFAULT_ROW_HEIGHT = 48;
+    const SAMPLE_ROW_HEIGHT = 76;
     const MIN_COL_WIDTH = 80;
     const MIN_ROW_HEIGHT = 32;
+
+    const COLUMN_SCHEMA = [
+      { type: 'text', sampleValue: 'Chữ', emptyValue: '' },
+      { type: 'textarea', sampleValue: 'Nhiều\nDòng', emptyValue: '' },
+      { type: 'number', sampleValue: '123', emptyValue: '' },
+      { type: 'date', sampleValue: '2026-06-09', emptyValue: '' },
+      { type: 'time', sampleValue: '08:30', emptyValue: '' },
+      { type: 'datetime-local', sampleValue: '2026-06-09T08:30', emptyValue: '' },
+      { type: 'email', sampleValue: 'hello@example.com', emptyValue: '' },
+      { type: 'tel', sampleValue: '0901234567', emptyValue: '' },
+      { type: 'url', sampleValue: 'https://example.com', emptyValue: '' },
+      { type: 'color', sampleValue: '#3b82f6', emptyValue: '#ffffff' },
+      { type: 'range', sampleValue: '75', emptyValue: '50', min: '0', max: '100' },
+      { type: 'checkbox', sampleValue: true, emptyValue: false },
+      {
+        type: 'select',
+        sampleValue: 'B',
+        emptyValue: '',
+        options: [
+          { value: '', label: 'Chọn' },
+          { value: 'A', label: 'A' },
+          { value: 'B', label: 'B' },
+          { value: 'C', label: 'C' },
+        ],
+      },
+      { type: 'password', sampleValue: 'matkhau', emptyValue: '' },
+      { type: 'month', sampleValue: '2026-06', emptyValue: '' },
+      { type: 'week', sampleValue: '2026-W24', emptyValue: '' },
+      { type: 'search', sampleValue: 'Tìm kiếm', emptyValue: '' },
+      { type: 'text', sampleValue: 'Văn bản', emptyValue: '' },
+      { type: 'number', sampleValue: '456', emptyValue: '' },
+      { type: 'textarea', sampleValue: 'Dòng 1\nDòng 2', emptyValue: '' },
+      { type: 'date', sampleValue: '2026-06-10', emptyValue: '' },
+      { type: 'time', sampleValue: '18:45', emptyValue: '' },
+      {
+        type: 'select',
+        sampleValue: 'C',
+        emptyValue: '',
+        options: [
+          { value: '', label: 'Chọn' },
+          { value: 'A', label: 'A' },
+          { value: 'B', label: 'B' },
+          { value: 'C', label: 'C' },
+        ],
+      },
+      { type: 'checkbox', sampleValue: false, emptyValue: false },
+      { type: 'url', sampleValue: 'https://openai.com', emptyValue: '' },
+      { type: 'text', sampleValue: 'Cuối dòng', emptyValue: '' },
+    ];
 
     const sheetViewport = document.getElementById('sheetViewport');
     const sheetWrap = document.getElementById('sheetWrap');
@@ -184,10 +264,7 @@
 
     function setZoom(nextZoom) {
       zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
-      const scale = zoom / 100;
-
-      // Dùng zoom để sticky vẫn hoạt động đúng khi cuộn
-      sheetWrap.style.zoom = String(scale);
+      sheetWrap.style.zoom = String(zoom / 100);
       zoomLabel.textContent = `${zoom}%`;
       zoomRange.value = String(zoom);
     }
@@ -218,64 +295,101 @@
       const row = tableBody.querySelector(`tr[data-row="${rowIndex}"]`);
       if (!row) return false;
 
-      return Array.from(row.querySelectorAll('.cell-content')).some((cell) => cell.textContent.trim() !== '');
+      return Array.from(row.querySelectorAll('[data-cell-control]')).some((control) => {
+        if (control.type === 'checkbox' || control.type === 'radio') {
+          return control.checked !== (control.dataset.initialValue === '1');
+        }
+
+        if (control.tagName === 'SELECT') {
+          return control.value !== control.dataset.initialValue;
+        }
+
+        if (control.tagName === 'TEXTAREA') {
+          return control.value !== control.dataset.initialValue;
+        }
+
+        return String(control.value ?? '') !== String(control.dataset.initialValue ?? '');
+      });
     }
 
-    function appendBlankRow() {
-      const rowIndex = rowHeights.length;
-      rowHeights.push(DEFAULT_ROW_HEIGHT);
-
-      const tr = document.createElement('tr');
-      tr.dataset.row = String(rowIndex);
-      tr.style.height = `${DEFAULT_ROW_HEIGHT}px`;
-
-      const rowHead = document.createElement('th');
-      rowHead.dataset.rowLabel = 'true';
-      rowHead.textContent = String(rowIndex + 1);
-      rowHead.className = [
-        'relative sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500 overflow-hidden',
-      ].join(' ');
-      rowHead.style.width = '4rem';
-      rowHead.style.minWidth = '4rem';
-      rowHead.style.maxWidth = '4rem';
-      rowHead.style.height = `${DEFAULT_ROW_HEIGHT}px`;
-
-      const rowHandle = document.createElement('div');
-      rowHandle.className = 'resize-handle-row';
-      rowHead.appendChild(rowHandle);
-      setupRowResize(rowHandle, rowIndex);
-
-      tr.appendChild(rowHead);
-
-      for (let col = 0; col < COLS; col += 1) {
-        const td = createCell(
-          'td',
-          '',
-          [
-            'sheet-cell border-b border-r border-slate-200 bg-white text-slate-900 transition-colors overflow-hidden',
-          ].join(' ')
-        );
-
-        td.dataset.col = String(col);
-        td.dataset.row = String(rowIndex);
-        td.style.width = `${colWidths[col]}px`;
-        td.style.minWidth = `${colWidths[col]}px`;
-        td.style.maxWidth = `${colWidths[col]}px`;
-        td.style.height = `${DEFAULT_ROW_HEIGHT}px`;
-
-        const content = td.querySelector('.cell-content');
-        content.addEventListener('input', () => {
-          // Nếu người dùng nhập vào dòng trống cuối cùng thì tự sinh thêm một dòng mới
-          if (rowIndex === rowHeights.length - 1 && rowHasContent(rowIndex)) {
-            appendBlankRow();
-          }
+    function createControl(schema, value) {
+      if (schema.type === 'textarea') {
+        const textarea = document.createElement('textarea');
+        textarea.className = 'cell-control';
+        textarea.dataset.cellControl = 'true';
+        textarea.dataset.initialValue = value ?? '';
+        textarea.rows = 2;
+        textarea.value = value ?? '';
+        textarea.addEventListener('focus', () => {
+          textarea.scrollTop = 0;
+          textarea.scrollLeft = 0;
         });
-
-        tr.appendChild(td);
+        textarea.addEventListener('blur', () => {
+          textarea.scrollTop = 0;
+          textarea.scrollLeft = 0;
+        });
+        return textarea;
       }
 
-      tableBody.appendChild(tr);
-      return tr;
+      if (schema.type === 'select') {
+        const select = document.createElement('select');
+        select.className = 'cell-control';
+        select.dataset.cellControl = 'true';
+        select.dataset.initialValue = value ?? '';
+        (schema.options || []).forEach((option) => {
+          const opt = document.createElement('option');
+          opt.value = option.value;
+          opt.textContent = option.label;
+          select.appendChild(opt);
+        });
+        select.value = value ?? '';
+        return select;
+      }
+
+      if (schema.type === 'checkbox') {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'cell-control flex items-center justify-center';
+        wrapper.style.padding = '0';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'h-4 w-4 accent-blue-600';
+        checkbox.dataset.cellControl = 'true';
+        checkbox.dataset.initialValue = value ? '1' : '0';
+        checkbox.checked = Boolean(value);
+        wrapper.appendChild(checkbox);
+        return wrapper;
+      }
+
+      const input = document.createElement('input');
+      input.type = schema.type;
+      input.className = 'cell-control';
+      input.dataset.cellControl = 'true';
+      input.dataset.initialValue = value ?? '';
+      input.value = value ?? '';
+
+      if (schema.type === 'range') {
+        input.className = 'cell-control w-full';
+        if (schema.min != null) input.min = schema.min;
+        if (schema.max != null) input.max = schema.max;
+      }
+
+      if (schema.type === 'color') {
+        input.className = 'cell-control w-full';
+        input.style.padding = '0';
+      }
+
+      input.addEventListener('focus', () => {
+        input.scrollTop = 0;
+        input.scrollLeft = 0;
+      });
+
+      input.addEventListener('blur', () => {
+        input.scrollTop = 0;
+        input.scrollLeft = 0;
+      });
+
+      return input;
     }
 
     function setupColumnResize(handle, colIndex) {
@@ -324,29 +438,58 @@
       });
     }
 
-    function createCell(tagName, text, extraClasses = '') {
-      const cell = document.createElement(tagName);
-      cell.className = extraClasses;
-      const content = document.createElement('div');
-      content.className = 'cell-content';
-      content.contentEditable = 'true';
-      content.spellcheck = false;
-      content.textContent = text;
+    function appendRow(preset = false) {
+      const rowIndex = rowHeights.length;
+      const rowHeight = preset ? SAMPLE_ROW_HEIGHT : DEFAULT_ROW_HEIGHT;
+      rowHeights.push(rowHeight);
 
-      content.addEventListener('focus', () => {
-        // Giữ vùng nhập bên trong ô ở vị trí đầu khi bắt đầu chỉnh sửa
-        content.scrollTop = 0;
-        content.scrollLeft = 0;
+      const tr = document.createElement('tr');
+      tr.dataset.row = String(rowIndex);
+      tr.style.height = `${rowHeight}px`;
+
+      const rowHead = document.createElement('th');
+      rowHead.dataset.rowLabel = 'true';
+      rowHead.textContent = String(rowIndex + 1);
+      rowHead.className = [
+        'relative sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-100 px-3 text-left text-xs font-semibold text-slate-500 overflow-hidden',
+      ].join(' ');
+      rowHead.style.width = '4rem';
+      rowHead.style.minWidth = '4rem';
+      rowHead.style.maxWidth = '4rem';
+      rowHead.style.height = `${rowHeight}px`;
+
+      const rowHandle = document.createElement('div');
+      rowHandle.className = 'resize-handle-row';
+      rowHead.appendChild(rowHandle);
+      setupRowResize(rowHandle, rowIndex);
+      tr.appendChild(rowHead);
+
+      COLUMN_SCHEMA.forEach((schema, colIndex) => {
+        const td = document.createElement('td');
+        td.className = 'sheet-cell border-b border-r border-slate-200 bg-white text-slate-900 overflow-hidden';
+        td.dataset.col = String(colIndex);
+        td.dataset.row = String(rowIndex);
+        td.style.width = `${colWidths[colIndex]}px`;
+        td.style.minWidth = `${colWidths[colIndex]}px`;
+        td.style.maxWidth = `${colWidths[colIndex]}px`;
+        td.style.height = `${rowHeight}px`;
+
+        const control = createControl(schema, preset ? schema.sampleValue : schema.emptyValue);
+        const onValueChange = () => {
+          if (rowIndex === rowHeights.length - 1 && rowHasContent(rowIndex)) {
+            appendRow(false);
+          }
+        };
+
+        control.addEventListener('input', onValueChange);
+        control.addEventListener('change', onValueChange);
+
+        td.appendChild(control);
+        tr.appendChild(td);
       });
 
-      content.addEventListener('blur', () => {
-        // Khi rời ô, đưa nội dung bên trong về đầu để ô kế tiếp luôn gọn gàng
-        content.scrollTop = 0;
-        content.scrollLeft = 0;
-      });
-
-      cell.appendChild(content);
-      return cell;
+      tableBody.appendChild(tr);
+      return tr;
     }
 
     function buildTable() {
@@ -380,10 +523,8 @@
       }
 
       tableHead.appendChild(headRow);
-
-      for (let row = 0; row < INITIAL_ROWS; row += 1) {
-        appendBlankRow();
-      }
+      appendRow(true);
+      appendRow(false);
     }
 
     zoomRange.addEventListener('input', (event) => {
