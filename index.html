@@ -239,9 +239,10 @@
     /* Chế độ form trên điện thoại */
     .mobile-form-viewport {
       display: none;
-      padding: 1rem;
+      padding: 0;
       overflow: auto;
       -webkit-overflow-scrolling: touch;
+      background: rgb(248 250 252);
     }
 
     .mobile-form-section {
@@ -257,10 +258,39 @@
       background: rgb(255 255 255);
     }
 
+    .mobile-row-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
     .mobile-row-title {
       font-size: 0.875rem;
       font-weight: 600;
       color: rgb(15 23 42);
+    }
+
+    .mobile-row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.35rem;
+    }
+
+    .mobile-row-action-button {
+      border-radius: 0.75rem;
+      border: 1px solid rgb(226 232 240);
+      background: rgb(255 255 255);
+      padding: 0.4rem 0.7rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgb(51 65 85);
+      box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    .mobile-row-action-button:active {
+      transform: translateY(1px);
     }
 
     .mobile-fieldset {
@@ -310,6 +340,23 @@
     .mobile-form-viewport textarea.cell-control {
       min-height: 5.25rem;
       line-height: 1.5;
+      resize: vertical;
+      overflow: auto;
+    }
+
+    .mobile-form-viewport select.cell-control {
+      -webkit-appearance: none;
+      appearance: none;
+      background-color: rgb(255 255 255);
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgb(100 116 139) 50%),
+        linear-gradient(135deg, rgb(100 116 139) 50%, transparent 50%);
+      background-position:
+        calc(100% - 1rem) center,
+        calc(100% - 0.7rem) center;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 2.5rem;
     }
 
     .mobile-form-viewport .cell-control[type="range"] {
@@ -322,7 +369,10 @@
 
     .mobile-form-viewport .cell-control[type="color"] {
       min-height: 3.25rem;
-      padding: 0.25rem;
+      padding: 0;
+      border-color: transparent;
+      box-shadow: none;
+      background: transparent;
     }
 
     .mobile-field-row-checkbox {
@@ -382,26 +432,12 @@
           </div>
         </div>
 
-        <div id="mobileFormViewport" class="mobile-form-viewport flex-1 overflow-auto border bg-white shadow-xl shadow-slate-200/60"></div>
+        <div id="mobileFormViewport" class="mobile-form-viewport flex-1 overflow-auto"></div>
       </div>
     </main>
   </div>
 
   <script>
-    // Chuyển số cột thành tên kiểu Excel: A, B, C ... Z, AA, AB ...
-    function getColumnName(index) {
-      let name = '';
-      let current = index + 1;
-
-      while (current > 0) {
-        const remainder = (current - 1) % 26;
-        name = String.fromCharCode(65 + remainder) + name;
-        current = Math.floor((current - 1) / 26);
-      }
-
-      return name;
-    }
-
     const DEFAULT_ZOOM = 100;
     const MIN_ZOOM = 50;
     const MAX_ZOOM = 200;
@@ -457,11 +493,6 @@
             options: [
               { value: 'A', label: 'A' },
               { value: 'B', label: 'B' },
-              { value: 'C', label: 'C' },
-              { value: 'C', label: 'C' },
-              { value: 'C', label: 'C' },
-              { value: 'C', label: 'C' },
-              { value: 'C', label: 'C' },
               { value: 'C', label: 'C' },
             ],
           },
@@ -878,10 +909,20 @@
         const rowCard = document.createElement('section');
         rowCard.className = 'mobile-row-card';
 
+        const rowHeader = document.createElement('div');
+        rowHeader.className = 'mobile-row-header';
+
         const rowTitle = document.createElement('div');
         rowTitle.className = 'mobile-row-title';
         rowTitle.textContent = `Dòng ${logicalRowIndex + 1}`;
-        rowCard.appendChild(rowTitle);
+        rowHeader.appendChild(rowTitle);
+
+        const mobileActions = createMobileActionButtons(logicalRowIndex);
+        if (mobileActions) {
+          rowHeader.appendChild(mobileActions);
+        }
+
+        rowCard.appendChild(rowHeader);
 
         let flatColIndex = 0;
 
@@ -908,7 +949,7 @@
 
             const label = document.createElement('label');
             label.className = 'mobile-field-label';
-            label.textContent = column.headerLabel || getColumnName(colIndex);
+            label.textContent = column.headerLabel || '';
             label.htmlFor = `mobile-${logicalRowIndex}-${colIndex}`;
 
             const tableControl = getTableCellControl(logicalRowIndex, colIndex);
@@ -921,7 +962,7 @@
               mobileControl.className = 'mobile-checkbox-control';
               mobileControl.id = `mobile-${logicalRowIndex}-${colIndex}`;
               mobileControl.checked = Boolean(currentValue);
-              mobileControl.setAttribute('aria-label', column.headerLabel || getColumnName(colIndex));
+              mobileControl.setAttribute('aria-label', column.headerLabel || '');
             } else {
               mobileControl = createControl(column, currentValue, logicalRowIndex);
 
@@ -1196,6 +1237,29 @@
 
       cell.appendChild(wrapper);
       return cell;
+    }
+
+    // Tạo cụm nút action cho mobile ở cùng hàng với tiêu đề dòng
+    function createMobileActionButtons(rowIndex) {
+      const config = FIXED_COLUMN_TEMPLATE.action;
+      if (!config || !config.enabled || !Array.isArray(config.buttons) || !config.buttons.length) {
+        return null;
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mobile-row-actions';
+
+      config.buttons.forEach((buttonDef) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = buttonDef.label || 'Action';
+        button.dataset.row = String(rowIndex);
+        button.dataset.action = buttonDef.action || buttonDef.label || 'action';
+        button.className = ['mobile-row-action-button', buttonDef.className || ''].filter(Boolean).join(' ');
+        wrapper.appendChild(button);
+      });
+
+      return wrapper;
     }
 
     // Tạo ô cố định trên header cho cột STT hoặc action
@@ -1477,7 +1541,7 @@
         for (let col = 0; col < COLS; col += 1) {
           const schema = COLUMN_SCHEMA[col] || {};
           const groupLabel = schema.groupLabel || '';
-          const headerLabel = schema.headerLabel || getColumnName(col);
+          const headerLabel = schema.headerLabel || '';
           const prevGroupLabel = COLUMN_SCHEMA[col - 1]?.groupLabel || '';
           const isGroupStart = Boolean(groupLabel) && groupLabel !== prevGroupLabel;
 
@@ -1567,7 +1631,7 @@
           const schema = COLUMN_SCHEMA[col] || {};
           const th = document.createElement('th');
           th.dataset.col = String(col);
-          th.textContent = schema.headerLabel || getColumnName(col);
+          th.textContent = schema.headerLabel || '';
           th.className = [
             'sheet-table-header relative sticky top-0 z-20 h-10 border-b border-r px-3 text-left text-xs font-semibold',
           ].join(' ');
