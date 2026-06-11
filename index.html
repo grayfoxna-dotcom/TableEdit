@@ -103,6 +103,33 @@
     /* Viền ngoài khung bảng dùng chung màu với viền của các ô */
     #sheetViewport {
       border-color: var(--sheet-table-border-color);
+      width: var(--sheet-viewport-width, 100%);
+      max-height: var(--sheet-viewport-max-height, none);
+      align-self: flex-start;
+    }
+
+    .viewport-panel {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-radius: 1rem;
+      border: 1px solid rgb(226 232 240);
+      background: rgb(248 250 252);
+      padding: 0.5rem 0.75rem;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    .viewport-panel label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgb(71 85 105);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+      .viewport-panel {
+        display: none;
+      }
     }
 
     .cell-control {
@@ -398,31 +425,50 @@
     }
   </style>
 </head>
-<body class="h-screen overflow-hidden bg-slate-50 text-slate-900">
-  <div class="flex h-screen w-screen flex-col">
+<body class="bg-slate-50 text-slate-900">
+  <div class="flex w-full flex-col">
     <header class="flex items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
       <div>
         <h1 class="text-lg font-semibold tracking-wide">TableEdit</h1>
         <p class="text-xs text-slate-500">Bảng toàn màn hình, chỉnh sửa trực tiếp, phóng to thu nhỏ như Excel</p>
       </div>
 
-      <div class="zoom-panel flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
-        <button id="zoomOut" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">-</button>
-        <div class="min-w-20 text-center text-sm font-medium text-slate-700"><span id="zoomLabel">100%</span></div>
-        <button id="zoomIn" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">+</button>
-        <input id="zoomRange" type="range" min="50" max="200" value="100" class="w-36 accent-blue-500" />
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="viewport-panel">
+          <label for="viewportWidthRange">Rộng khung</label>
+          <input id="viewportWidthRange" type="range" min="60" max="100" step="5" value="100" class="w-36 accent-blue-500" />
+          <span id="viewportWidthLabel" class="min-w-12 text-right text-sm font-medium text-slate-700">100%</span>
+        </div>
+
+        <div class="viewport-panel">
+          <label for="rowLimitSelect">Số dòng hiển thị</label>
+          <select id="rowLimitSelect" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none">
+            <option value="5" selected>5 dòng</option>
+            <option value="15">15 dòng</option>
+            <option value="25">25 dòng</option>
+            <option value="50">50 dòng</option>
+            <option value="100">100 dòng</option>
+          </select>
+        </div>
+
+        <div class="zoom-panel flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
+          <button id="zoomOut" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">-</button>
+          <div class="min-w-20 text-center text-sm font-medium text-slate-700"><span id="zoomLabel">100%</span></div>
+          <button id="zoomIn" class="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-100">+</button>
+          <input id="zoomRange" type="range" min="50" max="200" value="100" class="w-36 accent-blue-500" />
+        </div>
       </div>
     </header>
 
-    <main class="relative flex-1 overflow-hidden">
-      <div class="relative flex h-full w-full flex-col p-4">
+    <main class="relative">
+      <div class="relative flex w-full min-w-0 flex-col p-4">
         <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
           <span>Nhấn trực tiếp vào ô để sửa nội dung</span>
           <span>Ctrl + cuộn chuột để đổi zoom</span>
         </div>
 
-        <div id="sheetViewport" class="sheet-scroll relative flex-1 overflow-auto border bg-white shadow-xl shadow-slate-200/60">
-          <div id="sheetStage" class="relative">
+        <div id="sheetViewport" class="sheet-scroll relative min-w-0 overflow-auto border bg-white shadow-xl shadow-slate-200/60">
+          <div id="sheetStage" class="relative min-w-0">
             <div id="sheetWrap" class="sheet-zoom">
               <table class="w-max table-fixed border-separate border-spacing-0 text-sm">
                 <thead id="tableHead"></thead>
@@ -655,12 +701,17 @@
     const sheetWrap = document.getElementById('sheetWrap');
     const tableHead = document.getElementById('tableHead');
     const tableBody = document.getElementById('tableBody');
+    const viewportWidthRange = document.getElementById('viewportWidthRange');
+    const viewportWidthLabel = document.getElementById('viewportWidthLabel');
+    const rowLimitSelect = document.getElementById('rowLimitSelect');
     const zoomLabel = document.getElementById('zoomLabel');
     const zoomRange = document.getElementById('zoomRange');
     const zoomInBtn = document.getElementById('zoomIn');
     const zoomOutBtn = document.getElementById('zoomOut');
 
     let zoom = DEFAULT_ZOOM;
+    let viewportWidthPercent = Number(viewportWidthRange?.value || 100);
+    let visibleRowLimit = Number(rowLimitSelect?.value || 5);
     const colWidths = Array.from({ length: COLS }, () => DEFAULT_COL_WIDTH);
     const rowHeights = [];
     const mobileZoomQuery = window.matchMedia('(max-width: 768px)');
@@ -677,6 +728,7 @@
         sheetWrap.style.zoom = '1';
         zoomLabel.textContent = `${DEFAULT_ZOOM}%`;
         zoomRange.value = String(DEFAULT_ZOOM);
+        updateViewportSizing();
         return;
       }
 
@@ -684,6 +736,30 @@
       sheetWrap.style.zoom = String(zoom / 100);
       zoomLabel.textContent = `${zoom}%`;
       zoomRange.value = String(zoom);
+      updateViewportSizing();
+    }
+
+    // Đồng bộ width khung bảng và số dòng hiển thị
+    function updateViewportSizing() {
+      if (!sheetViewport) return;
+
+      const widthPercent = Math.min(100, Math.max(60, viewportWidthPercent));
+      const zoomFactor = zoom / 100;
+      const hasGroupHeader = COLUMN_SCHEMA.some((schema) => Boolean(schema.groupLabel));
+      const headerHeight = hasGroupHeader ? 80 : 40;
+      const isLocked = rowHeights.length >= Math.max(1, visibleRowLimit);
+      const lockedRowsHeight = rowHeights
+        .slice(0, Math.max(1, visibleRowLimit))
+        .reduce((sum, height) => sum + height, 0);
+      const maxHeight = Math.round((headerHeight + lockedRowsHeight) * zoomFactor + 4);
+
+      sheetViewport.style.setProperty('--sheet-viewport-width', `${widthPercent}%`);
+      sheetViewport.style.setProperty('--sheet-viewport-max-height', isLocked ? `${maxHeight}px` : 'none');
+      sheetViewport.style.flex = '0 0 auto';
+
+      if (viewportWidthLabel) {
+        viewportWidthLabel.textContent = `${widthPercent}%`;
+      }
     }
 
     // Đồng bộ nút zoom theo kích thước màn hình
@@ -697,6 +773,7 @@
 
       if (mobile) {
         setZoom(DEFAULT_ZOOM);
+        updateViewportSizing();
         renderMobileForm();
         return;
       }
@@ -706,6 +783,7 @@
       }
 
       setZoom(zoom);
+      updateViewportSizing();
     }
 
     function applyColumnWidth(colIndex, width) {
@@ -766,6 +844,8 @@
         el.style.minHeight = `${nextHeight}px`;
         el.style.maxHeight = `${nextHeight}px`;
       });
+
+      updateViewportSizing();
     }
 
     function rowHasContent(rowIndex) {
@@ -1220,7 +1300,7 @@
       cell.style.height = `${rowHeight}px`;
 
       const wrapper = document.createElement('div');
-      wrapper.className = 'flex h-full w-full items-center justify-center gap-1';
+      wrapper.className = 'flex w-full items-center justify-center gap-1 py-1';
 
       (config.buttons || []).forEach((buttonDef) => {
         const button = document.createElement('button');
@@ -1229,7 +1309,7 @@
         button.dataset.row = String(rowIndex);
         button.dataset.action = buttonDef.action || buttonDef.label || 'action';
         button.className = [
-          'rounded-md px-2 py-1 text-[11px] font-medium transition',
+          'inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium leading-none transition',
           buttonDef.className || 'text-slate-700 hover:bg-slate-100',
         ].join(' ');
         wrapper.appendChild(button);
@@ -1237,6 +1317,54 @@
 
       cell.appendChild(wrapper);
       return cell;
+    }
+
+    // Xóa một dòng và dựng lại toàn bộ bảng để đồng bộ chỉ số, height và dòng trống cuối
+    function deleteRow(rowIndex) {
+      if (rowIndex < 0 || rowIndex >= rowHeights.length) return;
+
+      const row = tableBody.querySelector(`tr[data-row="${rowIndex}"]`);
+      if (row) {
+        row.remove();
+      }
+
+      rowHeights.splice(rowIndex, 1);
+
+      // Cập nhật lại chỉ số và height cho các dòng phía sau để không phải dựng lại toàn bộ bảng
+      Array.from(tableBody.querySelectorAll('tr[data-row]'))
+        .slice(rowIndex)
+        .forEach((rowEl, offset) => {
+          const actualIndex = rowIndex + offset;
+          rowEl.dataset.row = String(actualIndex);
+          rowEl.style.height = `${rowHeights[actualIndex]}px`;
+
+          const rowNumberCell = rowEl.querySelector('[data-fixed-column="rowNumber"]');
+          if (rowNumberCell) {
+            rowNumberCell.textContent = String(actualIndex + 1);
+            rowNumberCell.style.height = `${rowHeights[actualIndex]}px`;
+          }
+
+          const actionCell = rowEl.querySelector('[data-fixed-column="action"]');
+          if (actionCell) {
+            actionCell.style.height = `${rowHeights[actualIndex]}px`;
+            actionCell.querySelectorAll('button[data-action]').forEach((button) => {
+              button.dataset.row = String(actualIndex);
+            });
+          }
+
+          rowEl.querySelectorAll('[data-col]').forEach((cell) => {
+            cell.style.height = `${rowHeights[actualIndex]}px`;
+            cell.dataset.row = String(actualIndex);
+          });
+        });
+
+      // Nếu xóa hết thì giữ lại 1 dòng trống để bảng còn dùng được
+      if (rowHeights.length === 0 || rowHasContent(rowHeights.length - 1)) {
+        appendRow(false);
+        return;
+      }
+
+      updateViewportSizing();
     }
 
     // Tạo cụm nút action cho mobile ở cùng hàng với tiêu đề dòng
@@ -1255,7 +1383,10 @@
         button.textContent = buttonDef.label || 'Action';
         button.dataset.row = String(rowIndex);
         button.dataset.action = buttonDef.action || buttonDef.label || 'action';
-        button.className = ['mobile-row-action-button', buttonDef.className || ''].filter(Boolean).join(' ');
+        button.className = [
+          'mobile-row-action-button inline-flex items-center justify-center whitespace-nowrap leading-none',
+          buttonDef.className || '',
+        ].filter(Boolean).join(' ');
         wrapper.appendChild(button);
       });
 
@@ -1494,7 +1625,10 @@
 
         const control = createControl(schema, preset ? schema.sampleValue : schema.emptyValue, rowIndex);
         const onValueChange = () => {
-          if (rowIndex === rowHeights.length - 1 && rowHasContent(rowIndex)) {
+          const currentRowIndex = Number(tr.dataset.row);
+          if (Number.isNaN(currentRowIndex)) return;
+
+          if (currentRowIndex === rowHeights.length - 1 && rowHasContent(currentRowIndex)) {
             appendRow(false);
           }
         };
@@ -1516,6 +1650,7 @@
         applyFixedColumnWidth('rowNumber', getFixedColumnWidth('rowNumber'));
       }
 
+      updateViewportSizing();
       return tr;
     }
 
@@ -1660,6 +1795,7 @@
 
       appendRow(true);
       appendRow(false);
+      updateViewportSizing();
     }
 
     zoomRange.addEventListener('input', (event) => {
@@ -1674,6 +1810,20 @@
       setZoom(zoom - STEP_ZOOM);
     });
 
+    if (viewportWidthRange) {
+      viewportWidthRange.addEventListener('input', (event) => {
+        viewportWidthPercent = Number(event.target.value || 100);
+        updateViewportSizing();
+      });
+    }
+
+    if (rowLimitSelect) {
+      rowLimitSelect.addEventListener('change', (event) => {
+        visibleRowLimit = Number(event.target.value || 5);
+        updateViewportSizing();
+      });
+    }
+
     sheetViewport.addEventListener('wheel', (event) => {
       if (isMobileLayout()) return;
       if (!event.ctrlKey) return;
@@ -1685,6 +1835,19 @@
 
     mobileZoomQuery.addEventListener('change', syncResponsiveZoomState);
     window.addEventListener('resize', syncResponsiveZoomState);
+
+    tableBody.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const rowIndex = Number(button.dataset.row);
+      if (Number.isNaN(rowIndex)) return;
+
+      if (action === 'delete') {
+        deleteRow(rowIndex);
+      }
+    });
 
     buildTable();
     syncResponsiveZoomState();
