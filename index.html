@@ -94,6 +94,40 @@
       color: var(--sheet-table-row-number-text-color);
     }
 
+    /* Ô action của từng dòng dùng nền như ô dữ liệu để nút không bị nhìn như header */
+    .sheet-action-cell {
+      background: var(--sheet-cell-background-color);
+      border-color: var(--sheet-table-border-color);
+      color: rgb(15 23 42);
+    }
+
+    /* Nút action dạng phẳng, nhỏ gọn để không chiếm hết chiều cao ô */
+    .sheet-action-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      align-self: center;
+      flex: 0 0 auto;
+      min-width: 0;
+      height: 1.5rem;
+      padding: 0 0.5rem;
+      border: 1px solid transparent;
+      border-radius: 0;
+      box-sizing: border-box;
+      background-clip: padding-box;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+        transform 0.15s ease;
+    }
+
+    .sheet-action-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--sheet-cell-control-focus-border-color) 22%, transparent);
+    }
+
     .sheet-corner-cell {
       background: var(--sheet-table-header-background-color);
       border-color: var(--sheet-table-border-color);
@@ -305,15 +339,33 @@
       gap: 0.35rem;
     }
 
+    /* Nút action ở mobile cũng giữ kiểu phẳng, không bo tròn lớn */
     .mobile-row-action-button {
-      border-radius: 0.75rem;
-      border: 1px solid rgb(226 232 240);
-      background: rgb(255 255 255);
-      padding: 0.4rem 0.7rem;
-      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      height: 1.75rem;
+      padding: 0 0.55rem;
+      border: 1px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      font-size: 0.6875rem;
       font-weight: 600;
       color: rgb(51 65 85);
-      box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+      line-height: 1;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+        transform 0.15s ease;
+    }
+
+    .mobile-row-action-button:hover {
+      background: rgb(248 250 252);
+    }
+
+    .mobile-row-action-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--sheet-cell-control-focus-border-color) 22%, transparent);
     }
 
     .mobile-row-action-button:active {
@@ -487,10 +539,11 @@
     const DEFAULT_ZOOM = 100;
     const MIN_ZOOM = 50;
     const MAX_ZOOM = 200;
-    const STEP_ZOOM = 10;
+    // Nút +/- chỉ nhích nhẹ, còn cuộn chuột dùng bước lớn hơn để zoom nhanh
+    const STEP_ZOOM_BUTTON = 1;
+    const STEP_ZOOM_WHEEL = 10;
     const DEFAULT_COL_WIDTH = 144;
     const DEFAULT_ROW_HEIGHT = 48;
-    const SAMPLE_ROW_HEIGHT = 76;
     const MIN_COL_WIDTH = 80;
     const MIN_ROW_HEIGHT = 32;
 
@@ -499,43 +552,50 @@
       {
         groupLabel: 'Thông tin cơ bản',
         columns: [
-          { headerLabel: 'Chữ', type: 'text', sampleValue: 'Chữ', emptyValue: '' },
-          { headerLabel: 'Nhiều dòng', type: 'textarea', sampleValue: 'Nhiều\nDòng', emptyValue: '' },
-          { headerLabel: 'Số', type: 'number', sampleValue: '123', emptyValue: '' },
+          { 
+            headerLabel: 'Chữ', 
+            type: 'text', 
+            defaultValue: '',
+            placeholder: "Nhập chữ",
+            controlAttributes: [
+              {name: "disabled"},
+            ],
+          },
+          { headerLabel: 'Nhiều dòng', type: 'textarea', defaultValue: '' },
+          { headerLabel: 'Số', type: 'number', defaultValue: '' },
         ],
       },
       {
         groupLabel: 'Thời gian',
         columns: [
-          { headerLabel: 'Ngày', type: 'date', sampleValue: '2026-06-09', emptyValue: '' },
-          { headerLabel: 'Giờ', type: 'time', sampleValue: '08:30', emptyValue: '' },
-          { headerLabel: 'Ngày giờ', type: 'datetime-local', sampleValue: '2026-06-09T08:30', emptyValue: '' },
+          { headerLabel: 'Ngày', type: 'date', defaultValue: '' },
+          { headerLabel: 'Giờ', type: 'time', defaultValue: '' },
+          { headerLabel: 'Ngày giờ', type: 'datetime-local', defaultValue: '' },
         ],
       },
       {
         groupLabel: 'Liên hệ',
         columns: [
-          { headerLabel: 'Email', type: 'email', sampleValue: 'hello@example.com', emptyValue: '' },
-          { headerLabel: 'Điện thoại', type: 'tel', sampleValue: '0901234567', emptyValue: '' },
-          { headerLabel: 'Website', type: 'url', sampleValue: 'https://example.com', emptyValue: '' },
+          { headerLabel: 'Email', type: 'email', defaultValue: '' },
+          { headerLabel: 'Điện thoại', type: 'tel', defaultValue: '' },
+          { headerLabel: 'Website', type: 'url', defaultValue: '' },
         ],
       },
       {
         groupLabel: 'Hiển thị',
         columns: [
-          { headerLabel: 'Màu sắc', type: 'color', sampleValue: '#3b82f6', emptyValue: '#ffffff' },
-          { headerLabel: 'Range', type: 'range', sampleValue: '75', emptyValue: '50', min: '0', max: '100' },
+          { headerLabel: 'Màu sắc', type: 'color', defaultValue: '#ffffff' },
+          { headerLabel: 'Range', type: 'range', defaultValue: '50', min: '0', max: '100' },
         ],
       },
       {
         groupLabel: 'Trạng thái',
         columns: [
-          { headerLabel: 'Checkbox', type: 'checkbox', sampleValue: true, emptyValue: false },
+          { headerLabel: 'Checkbox', type: 'checkbox', defaultValue: false },
           {
             headerLabel: 'Checkbox list',
             type: 'checkbox-list',
-            sampleValue: ['A', 'C'],
-            emptyValue: [],
+            defaultValue: [],
             options: [
               { value: 'A', label: 'A' },
               { value: 'B', label: 'B' },
@@ -545,8 +605,7 @@
           {
             headerLabel: 'Select',
             type: 'select',
-            sampleValue: 'B',
-            emptyValue: '',
+            defaultValue: '',
             options: [
               { value: '', label: 'Chọn' },
               { value: 'A', label: 'A' },
@@ -559,12 +618,11 @@
       {
         groupLabel: 'Bảo mật',
         columns: [
-          { headerLabel: 'Password', type: 'password', sampleValue: 'matkhau', emptyValue: '' },
+          { headerLabel: 'Password', type: 'password', defaultValue: '' },
           {
             headerLabel: 'Radio list',
             type: 'radio-list',
-            sampleValue: 'B',
-            emptyValue: '',
+            defaultValue: '',
             options: [
               { value: 'A', label: 'Thấp' },
               { value: 'B', label: 'Trung bình' },
@@ -576,29 +634,28 @@
       {
         groupLabel: 'Thời gian',
         columns: [
-          { headerLabel: 'Month', type: 'month', sampleValue: '2026-06', emptyValue: '' },
-          { headerLabel: 'Week', type: 'week', sampleValue: '2026-W24', emptyValue: '' },
+          { headerLabel: 'Month', type: 'month', defaultValue: '' },
+          { headerLabel: 'Week', type: 'week', defaultValue: '' },
         ],
       },
       {
         groupLabel: 'Tìm kiếm',
         columns: [
-          { headerLabel: 'Search', type: 'search', sampleValue: 'Tìm kiếm', emptyValue: '' },
+          { headerLabel: 'Search', type: 'search', defaultValue: '' },
         ],
       },
       {
         groupLabel: 'Khác',
         columns: [
-          { headerLabel: 'Văn bản', type: 'text', sampleValue: 'Văn bản', emptyValue: '' },
-          { headerLabel: 'Số 2', type: 'number', sampleValue: '456', emptyValue: '' },
-          { headerLabel: 'Textarea 2', type: 'textarea', sampleValue: 'Dòng 1\nDòng 2', emptyValue: '' },
-          { headerLabel: 'Date 2', type: 'date', sampleValue: '2026-06-10', emptyValue: '' },
-          { headerLabel: 'Time 2', type: 'time', sampleValue: '18:45', emptyValue: '' },
+          { headerLabel: 'Văn bản', type: 'text', defaultValue: '' },
+          { headerLabel: 'Số 2', type: 'number', defaultValue: '' },
+          { headerLabel: 'Textarea 2', type: 'textarea', defaultValue: '' },
+          { headerLabel: 'Date 2', type: 'date', defaultValue: '' },
+          { headerLabel: 'Time 2', type: 'time', defaultValue: '' },
           {
             headerLabel: 'Select 2',
             type: 'select',
-            sampleValue: 'C',
-            emptyValue: '',
+            defaultValue: '',
             options: [
               { value: '', label: 'Chọn' },
               { value: 'A', label: 'A' },
@@ -606,9 +663,9 @@
               { value: 'C', label: 'C' },
             ],
           },
-          { headerLabel: 'Checkbox 2', type: 'checkbox', sampleValue: false, emptyValue: false },
-          { headerLabel: 'URL 2', type: 'url', sampleValue: 'https://openai.com', emptyValue: '' },
-          { headerLabel: 'Cuối dòng', type: 'text', sampleValue: 'Cuối dòng', emptyValue: '' },
+          { headerLabel: 'Checkbox 2', type: 'checkbox', defaultValue: false },
+          { headerLabel: 'URL 2', type: 'url', defaultValue: '' },
+          { headerLabel: 'Cuối dòng', type: 'text', defaultValue: '' },
         ],
       },
     ];
@@ -626,13 +683,12 @@
     {
       headerLabel: 'Mã khách hàng',
       type: 'text',
-      sampleValue: 'KH001',
-      emptyValue: '',
+      defaultValue: '',
+      placeholder: 'Nhập mã khách hàng',
       controlId: 'customer-code',
       controlClassName: 'bg-yellow-50',
       controlAttributes: [
         { name: 'required' },
-        { name: 'placeholder', value: 'Nhập mã khách hàng' },
         { name: 'data-field', value: 'customer_code' },
         { name: 'autocomplete', value: 'off' },
       ],
@@ -642,8 +698,7 @@
     {
       headerLabel: 'Tùy chọn',
       type: 'checkbox-list',
-      sampleValue: ['A', 'C'],
-      emptyValue: [],
+      defaultValue: [],
       options: [
         { value: 'A', label: 'A' },
         { value: 'B', label: 'B' },
@@ -654,8 +709,7 @@
     {
       headerLabel: 'Mức ưu tiên',
       type: 'radio-list',
-      sampleValue: 'B',
-      emptyValue: '',
+      defaultValue: '',
       options: [
         { value: 'A', label: 'Thấp' },
         { value: 'B', label: 'Trung bình' },
@@ -690,8 +744,16 @@
         cellClassName: '',
         stickyClassName: 'sticky right-0',
         buttons: [
-          { label: 'Sửa', action: 'edit', className: 'text-blue-600 hover:bg-blue-50' },
-          { label: 'Xóa', action: 'delete', className: 'text-rose-600 hover:bg-rose-50' },
+          {
+            label: 'Sửa',
+            action: 'edit',
+            className: 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700',
+          },
+          {
+            label: 'Xóa',
+            action: 'delete',
+            className: 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700',
+          },
         ],
       },
     };
@@ -839,10 +901,19 @@
       const nextHeight = Math.max(MIN_ROW_HEIGHT, height);
       rowHeights[rowIndex] = nextHeight;
 
-      document.querySelectorAll(`[data-row="${rowIndex}"]`).forEach((el) => {
-        el.style.height = `${nextHeight}px`;
-        el.style.minHeight = `${nextHeight}px`;
-        el.style.maxHeight = `${nextHeight}px`;
+      const row = tableBody.querySelector(`tr[data-row="${rowIndex}"]`);
+      if (!row) return;
+
+      // Chỉ áp chiều cao cho hàng và các ô trong hàng, không chạm vào nút action bên trong
+      row.style.height = `${nextHeight}px`;
+      row.style.minHeight = `${nextHeight}px`;
+      row.style.maxHeight = `${nextHeight}px`;
+
+      Array.from(row.children).forEach((cell) => {
+        if (!(cell instanceof HTMLElement)) return;
+        cell.style.height = `${nextHeight}px`;
+        cell.style.minHeight = `${nextHeight}px`;
+        cell.style.maxHeight = `${nextHeight}px`;
       });
 
       updateViewportSizing();
@@ -1183,7 +1254,6 @@
           }
 
           syncValue();
-          requestAnimationFrame(() => autoFitListRow(wrapper));
         });
 
         const span = document.createElement('span');
@@ -1197,6 +1267,7 @@
       syncValue();
       wrapper.dataset.initialValue = wrapper.dataset.controlValue || '';
       applyControlCustomization(wrapper, schema);
+      bindHorizontalCenterOnFocus(wrapper);
       requestAnimationFrame(() => autoFitListRow(wrapper));
       return wrapper;
     }
@@ -1261,6 +1332,103 @@
       });
     }
 
+    // Gán placeholder theo schema cho những control nhập chữ
+    function applyControlPlaceholder(element, schema) {
+      if (!element || schema.placeholder == null) return;
+
+      if (element.tagName === 'SELECT') return;
+      if (schema.type === 'checkbox' || schema.type === 'checkbox-list' || schema.type === 'radio-list') {
+        return;
+      }
+
+      element.setAttribute('placeholder', String(schema.placeholder));
+    }
+
+    // Khi control được focus hoặc click xong, kéo ngang ô đó về giữa khung bảng
+    function centerFocusedCellHorizontally(control, smooth = true) {
+      if (!sheetViewport || !control || isMobileLayout()) return;
+
+      const cell = control.closest('td[data-col]');
+      if (!cell) return;
+
+      const viewportRect = sheetViewport.getBoundingClientRect();
+      const cellRect = cell.getBoundingClientRect();
+      const viewportCenterX = viewportRect.left + viewportRect.width / 2;
+      const cellCenterX = cellRect.left + cellRect.width / 2;
+      const deltaX = cellCenterX - viewportCenterX;
+
+      // Nếu ô đã gần giữa rồi thì bỏ qua để tránh giật nhẹ
+      if (Math.abs(deltaX) < 8) return;
+
+      const maxScrollLeft = Math.max(0, sheetViewport.scrollWidth - sheetViewport.clientWidth);
+      const nextScrollLeft = Math.min(maxScrollLeft, Math.max(0, sheetViewport.scrollLeft + deltaX));
+      // Cuộn mượt khi đi bằng bàn phím, còn nhấn chuột thì canh ngay lập tức để click không bị lỡ
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (smooth && typeof sheetViewport.scrollTo === 'function' && !prefersReducedMotion) {
+        sheetViewport.scrollTo({ left: nextScrollLeft, behavior: 'smooth' });
+        return;
+      }
+
+      sheetViewport.scrollLeft = nextScrollLeft;
+    }
+
+    // Nhận diện các control có nút mở picker ở mép phải như date/time
+    function isPickerInput(control) {
+      if (!control || control.tagName !== 'INPUT') return false;
+      return ['date', 'time', 'datetime-local', 'month', 'week'].includes(control.type);
+    }
+
+    // Gắn sự kiện focus và click để tự canh ô đang nhập vào giữa bảng theo chiều ngang
+    function bindHorizontalCenterOnFocus(control) {
+      if (!control) return;
+
+      control.addEventListener('pointerdown', (event) => {
+        // Đánh dấu đây là nhấn chuột để focusin không canh giữa trước khi click chạy
+        if (event.button != null && event.button !== 0) return;
+
+        // Nếu là ô có picker hệ thống và người dùng bấm vào vùng nút lịch ở mép phải
+        // thì bỏ qua canh giữa để không làm lỡ thao tác mở lịch
+        if (isPickerInput(control)) {
+          const controlRect = control.getBoundingClientRect();
+          const pickerAreaWidth = 36;
+          if (event.clientX >= controlRect.right - pickerAreaWidth) {
+            control.dataset.skipPointerCenter = '1';
+            return;
+          }
+        }
+
+        control.dataset.pointerCenterTimestamp = String(Date.now());
+      }, true);
+
+      control.addEventListener('click', () => {
+        if (control.dataset.skipPointerCenter === '1') {
+          delete control.dataset.skipPointerCenter;
+          delete control.dataset.pointerCenterTimestamp;
+          return;
+        }
+
+        const pointerCenterTimestamp = Number(control.dataset.pointerCenterTimestamp || 0);
+        if (!pointerCenterTimestamp || Date.now() - pointerCenterTimestamp > 1000) return;
+
+        delete control.dataset.pointerCenterTimestamp;
+        requestAnimationFrame(() => centerFocusedCellHorizontally(control));
+      });
+
+      control.addEventListener('focusin', () => {
+        if (control.dataset.skipPointerCenter === '1') return;
+
+        const pointerCenterTimestamp = Number(control.dataset.pointerCenterTimestamp || 0);
+        if (pointerCenterTimestamp && Date.now() - pointerCenterTimestamp < 1000) return;
+
+        requestAnimationFrame(() => centerFocusedCellHorizontally(control));
+      });
+
+      control.addEventListener('blur', () => {
+        delete control.dataset.pointerCenterTimestamp;
+        delete control.dataset.skipPointerCenter;
+      });
+    }
+
     // Tạo ô cố định phía trái cho cột STT
     function createRowNumberCell(rowIndex, rowHeight) {
       const cell = document.createElement('td');
@@ -1289,7 +1457,7 @@
       const width = getFixedColumnWidth('action');
       cell.dataset.fixedColumn = 'action';
       cell.className = [
-        'sheet-table-header relative z-20 border-b border-l border-r px-2 text-xs font-semibold overflow-hidden align-middle',
+        'sheet-action-cell relative z-20 border-b border-l border-r px-2 text-xs overflow-hidden align-middle',
         config.stickyClassName,
         config.className,
         config.cellClassName,
@@ -1300,7 +1468,7 @@
       cell.style.height = `${rowHeight}px`;
 
       const wrapper = document.createElement('div');
-      wrapper.className = 'flex w-full items-center justify-center gap-1 py-1';
+      wrapper.className = 'flex h-full w-full items-center justify-center gap-1 px-1 py-0.5';
 
       (config.buttons || []).forEach((buttonDef) => {
         const button = document.createElement('button');
@@ -1309,7 +1477,7 @@
         button.dataset.row = String(rowIndex);
         button.dataset.action = buttonDef.action || buttonDef.label || 'action';
         button.className = [
-          'inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium leading-none transition',
+          'sheet-action-button',
           buttonDef.className || 'text-slate-700 hover:bg-slate-100',
         ].join(' ');
         wrapper.appendChild(button);
@@ -1319,9 +1487,12 @@
       return cell;
     }
 
-    // Xóa một dòng và dựng lại toàn bộ bảng để đồng bộ chỉ số, height và dòng trống cuối
+    // Xóa một dòng dữ liệu, nhưng luôn chừa lại dòng trống đặc biệt ở cuối bảng
     function deleteRow(rowIndex) {
       if (rowIndex < 0 || rowIndex >= rowHeights.length) return;
+
+      // Dòng cuối luôn là dòng trống đặc biệt, không được phép xóa
+      if (rowIndex === rowHeights.length - 1) return;
 
       const row = tableBody.querySelector(`tr[data-row="${rowIndex}"]`);
       if (row) {
@@ -1357,12 +1528,6 @@
             cell.dataset.row = String(actualIndex);
           });
         });
-
-      // Nếu xóa hết thì giữ lại 1 dòng trống để bảng còn dùng được
-      if (rowHeights.length === 0 || rowHasContent(rowHeights.length - 1)) {
-        appendRow(false);
-        return;
-      }
 
       updateViewportSizing();
     }
@@ -1426,7 +1591,9 @@
         textarea.dataset.initialValue = value ?? '';
         textarea.rows = 2;
         textarea.value = value ?? '';
+        applyControlPlaceholder(textarea, schema);
         applyControlCustomization(textarea, schema);
+        bindHorizontalCenterOnFocus(textarea);
         textarea.addEventListener('focus', () => {
           textarea.scrollTop = 0;
           textarea.scrollLeft = 0;
@@ -1451,6 +1618,7 @@
         });
         select.value = value ?? '';
         applyControlCustomization(select, schema);
+        bindHorizontalCenterOnFocus(select);
         return select;
       }
 
@@ -1483,6 +1651,7 @@
         checkbox.dataset.initialValue = value ? '1' : '0';
         checkbox.checked = Boolean(value);
         applyControlCustomization(checkbox, schema, 'm-0');
+        bindHorizontalCenterOnFocus(wrapper);
         wrapper.appendChild(checkbox);
         return wrapper;
       }
@@ -1493,6 +1662,7 @@
       input.dataset.cellControl = 'true';
       input.dataset.initialValue = value ?? '';
       input.value = value ?? '';
+      applyControlPlaceholder(input, schema);
 
       if (schema.type === 'range') {
         input.className = 'cell-control w-full';
@@ -1506,6 +1676,7 @@
       }
 
       applyControlCustomization(input, schema);
+      bindHorizontalCenterOnFocus(input);
 
       input.addEventListener('focus', () => {
         input.scrollTop = 0;
@@ -1595,9 +1766,19 @@
       });
     }
 
-    function appendRow(preset = false) {
+    function scrollSheetViewportToBottom() {
+      if (!sheetViewport) return;
+      if (isMobileLayout()) return;
+
+      // Đợi layout cập nhật xong rồi mới kéo xuống cuối bảng
+      requestAnimationFrame(() => {
+        sheetViewport.scrollTop = Math.max(0, sheetViewport.scrollHeight - sheetViewport.clientHeight);
+      });
+    }
+
+    function appendRow({ autoScrollToBottom = false } = {}) {
       const rowIndex = rowHeights.length;
-      const rowHeight = preset ? SAMPLE_ROW_HEIGHT : DEFAULT_ROW_HEIGHT;
+      const rowHeight = DEFAULT_ROW_HEIGHT;
       rowHeights.push(rowHeight);
 
       const tr = document.createElement('tr');
@@ -1623,13 +1804,13 @@
         td.style.maxWidth = `${colWidths[colIndex]}px`;
         td.style.height = `${rowHeight}px`;
 
-        const control = createControl(schema, preset ? schema.sampleValue : schema.emptyValue, rowIndex);
+        const control = createControl(schema, schema.defaultValue, rowIndex);
         const onValueChange = () => {
           const currentRowIndex = Number(tr.dataset.row);
           if (Number.isNaN(currentRowIndex)) return;
 
           if (currentRowIndex === rowHeights.length - 1 && rowHasContent(currentRowIndex)) {
-            appendRow(false);
+            appendRow({ autoScrollToBottom: true });
           }
         };
 
@@ -1651,6 +1832,12 @@
       }
 
       updateViewportSizing();
+
+      // Khi đã chạm ngưỡng số dòng hiển thị thì tự kéo xuống cuối để luôn thấy dòng mới
+      if (autoScrollToBottom && rowHeights.length >= Math.max(1, visibleRowLimit)) {
+        scrollSheetViewportToBottom();
+      }
+
       return tr;
     }
 
@@ -1793,8 +1980,7 @@
       applyFixedColumnWidth('rowNumber', fixedRowNumberWidth);
       applyFixedColumnWidth('action', fixedActionWidth);
 
-      appendRow(true);
-      appendRow(false);
+      appendRow();
       updateViewportSizing();
     }
 
@@ -1803,11 +1989,11 @@
     });
 
     zoomInBtn.addEventListener('click', () => {
-      setZoom(zoom + STEP_ZOOM);
+      setZoom(zoom + STEP_ZOOM_BUTTON);
     });
 
     zoomOutBtn.addEventListener('click', () => {
-      setZoom(zoom - STEP_ZOOM);
+      setZoom(zoom - STEP_ZOOM_BUTTON);
     });
 
     if (viewportWidthRange) {
@@ -1830,13 +2016,14 @@
       event.preventDefault();
 
       const direction = event.deltaY < 0 ? 1 : -1;
-      setZoom(zoom + direction * STEP_ZOOM);
+      setZoom(zoom + direction * STEP_ZOOM_WHEEL);
     }, { passive: false });
 
     mobileZoomQuery.addEventListener('change', syncResponsiveZoomState);
     window.addEventListener('resize', syncResponsiveZoomState);
 
-    tableBody.addEventListener('click', (event) => {
+    // Bắt sự kiện action cho cả bảng desktop và form mobile để dùng chung 1 logic
+    function handleActionButtonClick(event) {
       const button = event.target.closest('button[data-action]');
       if (!button) return;
 
@@ -1847,7 +2034,10 @@
       if (action === 'delete') {
         deleteRow(rowIndex);
       }
-    });
+    }
+
+    tableBody.addEventListener('click', handleActionButtonClick);
+    mobileFormViewport.addEventListener('click', handleActionButtonClick);
 
     buildTable();
     syncResponsiveZoomState();
